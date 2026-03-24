@@ -89,20 +89,128 @@ function Toast({ msg, type }) {
 const SECTION_DIVIDER = <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.07)', margin: '32px 0' }} />;
 
 // ── Save status indicator ─────────────────────────────────────────────────────
-function SaveStatus({ dirty, saved }) {
+function SaveStatus({ dirty, saved, savedMsg }) {
   if (dirty) return (
     <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#fb923c', fontSize: '0.78rem' }}>
       <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fb923c', flexShrink: 0 }} />
-      Sin guardar
+      Tienes cambios sin guardar
     </span>
   );
   if (saved) return (
     <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#34d399', fontSize: '0.78rem' }}>
       <span style={{ fontSize: '1rem', lineHeight: 1 }}>✓</span>
-      Guardado
+      {savedMsg || 'Guardado'}
     </span>
   );
   return null;
+}
+
+// ── Setup checklist ───────────────────────────────────────────────────────────
+function SetupChecklist({ criteria, categories, participants, judges, onNavigate }) {
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('coreoChecklistCollapsed') === '1');
+
+  const toggle = () => setCollapsed(v => {
+    localStorage.setItem('coreoChecklistCollapsed', v ? '0' : '1');
+    return !v;
+  });
+
+  const steps = [
+    {
+      label: 'Define los bloques y categorías',
+      hint: '¿Cuántas partes tiene el evento y qué estilos van a competir?',
+      done: categories.length > 0,
+      tab: 'config',
+    },
+    {
+      label: 'Configura los criterios de puntuación',
+      hint: '¿Qué van a valorar los jueces? Técnica, Expresión...',
+      done: criteria.length > 0,
+      tab: 'config',
+    },
+    {
+      label: 'Añade los jueces',
+      hint: 'Crea sus accesos para que puedan puntuar desde su móvil.',
+      done: judges.length > 0,
+      tab: 'config',
+    },
+    {
+      label: 'Añade los participantes',
+      hint: 'Grupos, solos o parejas que van a actuar.',
+      done: participants.length > 0,
+      tab: 'participantes',
+    },
+    {
+      label: 'Define el orden de actuación',
+      hint: 'Ajusta el orden en que saldrán al escenario.',
+      done: participants.length > 0 && participants.some(p => p.act_order != null),
+      tab: 'orden',
+    },
+  ];
+
+  const doneCount = steps.filter(s => s.done).length;
+  const allDone = doneCount === steps.length;
+  const pct = Math.round((doneCount / steps.length) * 100);
+
+  return (
+    <div style={{ marginBottom: '28px', borderRadius: '10px', border: `1px solid ${allDone ? 'rgba(52,211,153,0.25)' : 'rgba(126,207,255,0.15)'}`, overflow: 'hidden' }}>
+      {/* Header */}
+      <div
+        onClick={toggle}
+        style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', cursor: 'pointer', background: allDone ? 'rgba(52,211,153,0.06)' : 'rgba(126,207,255,0.04)', userSelect: 'none' }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: collapsed ? 0 : '8px' }}>
+            <span style={{ color: allDone ? '#34d399' : '#7ecfff', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.1em' }}>
+              {allDone ? '✓ TODO LISTO PARA EMPEZAR' : `PREPARACIÓN DEL EVENTO — ${doneCount} de ${steps.length} pasos completados`}
+            </span>
+          </div>
+          {!collapsed && (
+            <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: allDone ? '#34d399' : '#7ecfff', borderRadius: '2px', transition: 'width 0.4s ease' }} />
+            </div>
+          )}
+        </div>
+        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>{collapsed ? 'Ver pasos ↓' : 'Ocultar ↑'}</span>
+      </div>
+
+      {/* Steps */}
+      {!collapsed && (
+        <div style={{ padding: '4px 0 10px' }}>
+          {steps.map((s, i) => (
+            <div
+              key={i}
+              onClick={() => !s.done && onNavigate(s.tab)}
+              style={{
+                display: 'flex', alignItems: 'flex-start', gap: '14px',
+                padding: '10px 18px', cursor: s.done ? 'default' : 'pointer',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { if (!s.done) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <div style={{
+                width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, marginTop: '1px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: s.done ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${s.done ? '#34d399' : 'rgba(255,255,255,0.15)'}`,
+                fontSize: '0.7rem', fontWeight: 700,
+                color: s.done ? '#34d399' : 'rgba(255,255,255,0.3)',
+              }}>
+                {s.done ? '✓' : i + 1}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: s.done ? 400 : 600, color: s.done ? 'rgba(255,255,255,0.35)' : '#fff', textDecoration: s.done ? 'line-through' : 'none' }}>
+                  {s.label}
+                </div>
+                {!s.done && <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{s.hint}</div>}
+              </div>
+              {!s.done && <span style={{ color: '#7ecfff', fontSize: '0.72rem', alignSelf: 'center', flexShrink: 0 }}>Ir →</span>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ── CONFIG tab (criteria + categories + rounds) ───────────────────────────────
@@ -314,7 +422,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
           <button onClick={saveConfig} className="btn-primary" disabled={savingConfig}>
             {savingConfig ? 'Guardando...' : 'Guardar categorías y bloques'}
           </button>
-          <SaveStatus dirty={configDirty} saved={configSaved} />
+          <SaveStatus dirty={configDirty} saved={configSaved} savedMsg="Categorías y bloques guardados" />
         </div>
 
         {SECTION_DIVIDER}
@@ -345,7 +453,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
         <div style={{ display: 'flex', gap: '10px', marginTop: '12px', alignItems: 'center' }}>
           <button onClick={addCriterion} className="btn-secondary">+ Añadir criterio</button>
           <button onClick={saveCriteria} className="btn-primary" disabled={savingCriteria}>{savingCriteria ? 'Guardando...' : 'Guardar criterios'}</button>
-          <SaveStatus dirty={criteriaDirty} saved={criteriaSaved} />
+          <SaveStatus dirty={criteriaDirty} saved={criteriaSaved} savedMsg="Criterios guardados" />
         </div>
 
         {SECTION_DIVIDER}
@@ -765,7 +873,7 @@ function OrderTab({ tournamentId, participants, onUpdate }) {
           <button className="btn-primary" onClick={save} disabled={saving}>
             {saving ? 'Guardando...' : 'Guardar orden'}
           </button>
-          <SaveStatus dirty={orderDirty} saved={orderSaved} />
+          <SaveStatus dirty={orderDirty} saved={orderSaved} savedMsg="Orden guardado" />
         </div>
       </div>
 
@@ -1231,15 +1339,26 @@ export default function CoreoAdmin() {
   const parsedCategories = (() => { try { return JSON.parse(tournament.coreo_categories || '[]'); } catch { return []; } })();
   const roundsCount = tournament.coreo_rounds || 1;
 
+  const configOk = criteria.length > 0 && parsedCategories.length > 0 && judges.length > 0;
+  const participantesOk = participants.length > 0;
+  const ordenOk = participantesOk && participants.some(p => p.act_order != null);
+
+  const tabDot = (ok) => (
+    <span style={{
+      display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%',
+      background: ok ? '#34d399' : '#fb923c', marginLeft: '7px', verticalAlign: 'middle', flexShrink: 0,
+    }} />
+  );
+
   const TABS = isAdmin
     ? [
-        { key: 'config', label: 'Configuración' },
-        { key: 'participantes', label: `Participantes (${participants.length})` },
-        { key: 'orden', label: 'Orden' },
-        { key: 'en-vivo', label: 'En vivo' },
+        { key: 'config', label: <span>Configuración{tabDot(configOk)}</span> },
+        { key: 'participantes', label: <span>Participantes ({participants.length}){tabDot(participantesOk)}</span> },
+        { key: 'orden', label: <span>Orden{tabDot(ordenOk)}</span> },
+        { key: 'en-vivo', label: 'En escena' },
         { key: 'puntuaciones', label: 'Puntuaciones' },
       ]
-    : [{ key: 'en-vivo', label: 'En vivo' }];
+    : [{ key: 'en-vivo', label: 'En escena' }];
 
   const activeTab = TABS.find(t => t.key === tab) ? tab : TABS[0].key;
 
@@ -1276,6 +1395,7 @@ export default function CoreoAdmin() {
           <button key={t.key} onClick={() => setTab(t.key)} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             padding: '14px 18px', fontSize: '0.82rem', letterSpacing: '0.08em',
+            display: 'inline-flex', alignItems: 'center',
             color: activeTab === t.key ? '#7ecfff' : 'rgba(255,255,255,0.4)',
             borderBottom: activeTab === t.key ? '2px solid #7ecfff' : '2px solid transparent',
             transition: 'all 0.15s',
@@ -1287,6 +1407,15 @@ export default function CoreoAdmin() {
 
       {/* Content */}
       <div className="container" style={{ maxWidth: '960px', paddingTop: '28px' }}>
+        {isAdmin && activeTab !== 'en-vivo' && activeTab !== 'puntuaciones' && (
+          <SetupChecklist
+            criteria={criteria}
+            categories={parsedCategories}
+            participants={participants}
+            judges={judges}
+            onNavigate={setTab}
+          />
+        )}
         {activeTab === 'config' && (
           <ConfigTab
             tournamentId={Number(id)}
