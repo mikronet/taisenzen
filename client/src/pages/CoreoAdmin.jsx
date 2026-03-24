@@ -1383,6 +1383,23 @@ export default function CoreoAdmin() {
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button onClick={() => window.open(`/coreo-screen/${id}`, '_blank')} className="btn-secondary" style={{ fontSize: '0.8rem' }}>Ver pantalla</button>
+          {isAdmin && tournament.status !== 'finished' && (
+            <button
+              onClick={async () => {
+                if (!window.confirm('¿Finalizar el torneo? Esta acción no se puede deshacer.')) return;
+                const res = await apiFetch(`${API}/tournaments/${id}/finish`, { method: 'POST' });
+                if (res.ok) {
+                  setTournament(prev => ({ ...prev, status: 'finished' }));
+                }
+              }}
+              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171', fontSize: '0.78rem', padding: '6px 14px', borderRadius: '20px', cursor: 'pointer' }}
+            >
+              Finalizar torneo
+            </button>
+          )}
+          {isAdmin && tournament.status === 'finished' && (
+            <span style={{ color: '#34d399', fontSize: '0.75rem', border: '1px solid rgba(52,211,153,0.3)', borderRadius: '20px', padding: '6px 14px' }}>Torneo finalizado</span>
+          )}
           <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #333', color: '#666', fontSize: '0.78rem', padding: '6px 14px', borderRadius: '20px', cursor: 'pointer' }}>
             {isAdmin ? '← Torneos' : 'Salir'}
           </button>

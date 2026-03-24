@@ -396,4 +396,14 @@ router.get('/tournaments/:id/scores/summary', (req, res) => {
   res.json({ criteria, participants: result });
 });
 
+// Finish tournament (admin only)
+router.post('/tournaments/:id/finish', requireAdmin, (req, res) => {
+  const tid = Number(req.params.id);
+  const tournament = db.prepare('SELECT id FROM tournaments WHERE id = ? AND tournament_type = ?').get(tid, 'coreografia');
+  if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
+  db.prepare("UPDATE tournaments SET status = 'finished' WHERE id = ?").run(tid);
+  req.io.to(`screen:${tid}`).emit('coreo:tournament-finished', { tournamentId: tid });
+  res.json({ ok: true });
+});
+
 module.exports = router;

@@ -5,7 +5,7 @@ const db = require('../db');
 // Public: list active tournaments (no auth required)
 router.get('/active', (req, res) => {
   const tournaments = db.prepare(`
-    SELECT t.id, t.name, t.type, t.status, p.name as current_phase
+    SELECT t.id, t.name, t.type, t.tournament_type, t.status, p.name as current_phase
     FROM tournaments t
     LEFT JOIN phases p ON p.tournament_id = t.id AND p.status = 'active'
     WHERE t.status = 'active'

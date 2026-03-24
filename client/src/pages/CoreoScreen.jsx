@@ -96,30 +96,55 @@ export default function CoreoScreen() {
 
       <ParticleCanvas />
 
-      {/* Tournament name — top left */}
-      {tournamentInfo.name && (
-        <div style={{
-          position: 'fixed', top: '24px', left: '32px', zIndex: 2,
-          display: 'flex', flexDirection: 'column', gap: '2px',
-        }}>
-          <span style={{
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: 'clamp(0.9rem, 2vw, 1.3rem)',
-            letterSpacing: '0.2em',
-            color: 'rgba(126,207,255,0.7)',
-            lineHeight: 1,
-          }}>
-            {tournamentInfo.name}
-          </span>
-        </div>
-      )}
+      {/* TAISEN ZEN watermark — top left */}
+      <div style={{
+        position: 'fixed', top: '24px', left: '32px', zIndex: 2,
+        display: 'flex', alignItems: 'baseline', gap: '6px',
+      }}>
+        <span style={{
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: 'clamp(0.85rem, 1.8vw, 1.1rem)',
+          letterSpacing: '0.25em',
+          color: 'rgba(126,207,255,0.5)',
+          lineHeight: 1,
+        }}>TAISEN ZEN</span>
+      </div>
 
       {!onStage ? (
         // Idle screen
-        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '40px' }}>
-          <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 'clamp(3rem, 10vw, 7rem)', letterSpacing: '0.3em', color: '#7ecfff', textShadow: '0 0 40px rgba(126,207,255,0.5)', margin: 0, lineHeight: 1 }}>TAISEN</p>
-          <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 'clamp(1rem, 3vw, 2rem)', letterSpacing: '0.5em', color: 'rgba(126,207,255,0.5)', marginTop: '8px' }}>ZEN</p>
-          <p style={{ color: 'rgba(255,255,255,0.3)', marginTop: '40px', fontSize: 'clamp(0.8rem, 2vw, 1.1rem)', letterSpacing: '0.3em' }}>COMPETICIÓN COREOGRÁFICA</p>
+        <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
+
+          {/* Poster */}
+          {tournamentInfo.poster_path && (
+            <img
+              src={`/uploads/${tournamentInfo.poster_path}`}
+              alt="Cartel"
+              style={{
+                maxHeight: 'clamp(180px, 30vh, 340px)',
+                maxWidth: 'clamp(160px, 22vw, 260px)',
+                objectFit: 'contain',
+                borderRadius: '10px',
+                boxShadow: '0 8px 48px rgba(0,0,0,0.7)',
+                filter: 'brightness(0.95)',
+              }}
+            />
+          )}
+
+          {/* Tournament name */}
+          {tournamentInfo.name && (
+            <p style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 'clamp(2.8rem, 9vw, 6.5rem)',
+              letterSpacing: '0.12em',
+              color: '#fff',
+              textShadow: '0 0 60px rgba(126,207,255,0.4)',
+              margin: 0, lineHeight: 1,
+            }}>
+              {tournamentInfo.name}
+            </p>
+          )}
+
+          <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 'clamp(0.7rem, 1.8vw, 1rem)', letterSpacing: '0.4em', margin: 0 }}>COMPETICIÓN COREOGRÁFICA</p>
         </div>
       ) : (
         // On-stage display

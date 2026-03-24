@@ -5,12 +5,17 @@ const FEATURES = [
   {
     icon: '📺',
     title: 'Pantalla pública en tiempo real',
-    desc: 'Proyecta el bracket, el ranking y los resultados en cualquier TV o proyector. Todo se actualiza solo, sin recargar página. Incluye overlay del cronómetro y pantalla de aviso "¡PREPARARSE!".',
+    desc: 'Proyecta el bracket, ranking y resultados en cualquier TV o proyector — y en coreografía, muestra quién está en escena sin revelar nunca las puntuaciones. Todo se actualiza solo, sin recargar.',
   },
   {
     icon: '📱',
     title: 'Jueces desde el móvil',
-    desc: 'Cada juez entra con un código único desde su teléfono. Sin apps, sin cuentas, sin configuración. Puntúa con un deslizador o elige al ganador con un toque.',
+    desc: 'Cada juez entra con un código único desde su teléfono. Sin apps, sin cuentas, sin configuración. En batallas elige al ganador con un toque; en coreografía puntúa cada criterio con un deslizador.',
+  },
+  {
+    icon: '🎭',
+    title: 'Coreografía por criterios',
+    desc: 'Crea criterios de puntuación personalizados (técnica, musicalidad, originalidad…) con puntuación máxima ajustable. Los jueces puntúan cada criterio de forma independiente desde el móvil.',
   },
   {
     icon: '🎤',
@@ -54,29 +59,29 @@ const ROLES = [
     tag: 'ADMIN',
     color: '#e94560',
     title: 'Administrador',
-    desc: 'Control total: crea torneos, gestiona participantes y jueces, configura fases, edita cruces del bracket y finaliza el evento.',
-    items: ['Crear y eliminar torneos', 'Gestionar participantes y jueces', 'Editar cruces de eliminatorias', 'Reiniciar o finalizar el evento'],
+    desc: 'Control total: crea torneos de batallas o coreografía, gestiona participantes y jueces, configura criterios, edita el bracket y finaliza el evento.',
+    items: ['Crear torneos de batalla o coreografía', 'Configurar criterios y categorías coreo', 'Gestionar participantes y jueces', 'Editar cruces de eliminatorias', 'Finalizar el evento'],
   },
   {
     tag: 'ORGANIZADOR',
     color: '#ffd700',
     title: 'Organizador',
-    desc: 'Acceso por código. Gestiona el día a día del torneo: añade participantes, controla rondas y pantalla pública, sin necesidad de contraseña de admin.',
-    items: ['Añadir participantes en el momento', 'Iniciar y cerrar rondas', 'Controlar mensaje en pantalla', 'Ver puntuaciones y ranking'],
+    desc: 'Acceso por código. Gestiona el día a día: añade participantes, controla rondas, maneja la pantalla pública y la lista de orden en coreografía.',
+    items: ['Añadir participantes en el momento', 'Iniciar y cerrar rondas', 'Gestionar "en escena" en coreo', 'Ver puntuaciones y ranking'],
   },
   {
     tag: 'SPEAKER',
     color: '#4dc5e0',
     title: 'Speaker / MC',
-    desc: 'El rol pensado para el maestro de ceremonias. Acceso por código propio. Flujo completo de torneo desde el escenario, sin distracciones.',
+    desc: 'El rol pensado para el maestro de ceremonias. Acceso por código propio. Flujo completo de torneo de batallas desde el escenario, sin distracciones.',
     items: ['Avisar "¡PREPARARSE!" en pantalla', 'Iniciar rondas y batallas', 'Controlar el cronómetro', 'Avanzar a eliminatorias'],
   },
   {
     tag: 'JURADO',
     color: '#9c88ff',
     title: 'Jurado',
-    desc: 'Acceso instantáneo por código desde cualquier móvil. Interfaz limpia para puntuar en Filtros o votar al ganador en eliminatorias.',
-    items: ['Sin app ni registro', 'Puntuación 0–10 con deslizador', 'Voto eliminatoria con confirmación', 'Tiebreaker automático'],
+    desc: 'Acceso instantáneo por código desde cualquier móvil. En batallas vota al ganador; en coreografía puntúa cada criterio con un deslizador y puede corregir puntuaciones libremente.',
+    items: ['Sin app ni registro', 'Voto eliminatoria con confirmación', 'Sliders por criterio en coreografía', 'Navegación libre entre participantes'],
   },
 ];
 
@@ -249,8 +254,8 @@ export default function Landing() {
           <span style={{
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: '1.6rem', letterSpacing: '0.2em', color: '#fff',
-            textShadow: '0 0 20px rgba(233,69,96,0.5)',
-          }}>TAISEN</span>
+            textShadow: '0 0 20px rgba(126,207,255,0.5)',
+          }}>TAISEN ZEN</span>
         </Link>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <a href="#contacto" style={{
@@ -277,40 +282,40 @@ export default function Landing() {
           background: 'rgba(233,69,96,0.1)', border: '1px solid rgba(233,69,96,0.3)',
           borderRadius: '20px', marginBottom: '24px',
         }}>
-          <span style={{ color: '#e94560', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.15em' }}>
+          <span style={{ color: '#7ecfff', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.15em' }}>
             SOFTWARE DE COMPETICIÓN DE BAILE URBANO
           </span>
         </div>
         <h1 style={{
           fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 'clamp(4rem, 14vw, 9rem)',
-          letterSpacing: '0.25em', lineHeight: 1, marginBottom: '8px',
+          fontSize: 'clamp(3.5rem, 12vw, 8rem)',
+          letterSpacing: '0.2em', lineHeight: 1, marginBottom: '8px',
           color: '#fff',
-          textShadow: '0 0 40px rgba(233,69,96,0.7), 0 0 80px rgba(233,69,96,0.3)',
+          textShadow: '0 0 40px rgba(126,207,255,0.6), 0 0 80px rgba(126,207,255,0.2)',
         }}>
-          TAISEN
+          TAISEN ZEN
         </h1>
         <p style={{
           color: '#888', fontSize: 'clamp(0.75rem, 2vw, 1rem)',
           letterSpacing: '0.35em', textTransform: 'uppercase', marginBottom: '32px',
         }}>
-          Gestión de Batallas
+          Batallas · Coreográficos
         </p>
         <p style={{
           color: '#bbb', fontSize: 'clamp(1rem, 2.5vw, 1.3rem)',
-          maxWidth: '660px', lineHeight: 1.65, marginBottom: '48px',
+          maxWidth: '700px', lineHeight: 1.65, marginBottom: '48px',
         }}>
-          Organiza tu torneo de baile con pantalla en directo para el público, jueces en el móvil y un panel dedicado para el Speaker. Brackets automáticos, cronómetro en pantalla y avisos de preparación — todo sin instalar nada.
+          Gestiona torneos de batalla y competiciones coreográficas en un solo sistema. Pantalla en directo para el público, jueces en el móvil, brackets automáticos, criterios configurables y Speaker panel — todo sin instalar nada.
         </p>
         <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'center', marginBottom: '60px' }}>
           <a href="#contacto" style={{
             padding: '14px 32px',
-            background: 'linear-gradient(135deg, #e94560, #c0392b)',
+            background: 'linear-gradient(135deg, #3b9edd, #1a6fa8)',
             borderRadius: '8px', color: '#fff', fontWeight: 700,
             fontSize: '0.95rem', textDecoration: 'none', letterSpacing: '0.05em',
-            boxShadow: '0 4px 20px rgba(233,69,96,0.35)',
+            boxShadow: '0 4px 20px rgba(126,207,255,0.3)',
           }}>
-            Quiero TAISEN en mi torneo
+            Quiero TAISEN ZEN en mi torneo
           </a>
         </div>
 
@@ -325,7 +330,7 @@ export default function Landing() {
             { val: '4 roles', sub: 'Admin · Organizador · Speaker · Jurado' },
             { val: 'Sin instalación', sub: 'Acceso por código desde el móvil' },
             { val: 'Tiempo real', sub: 'Pantalla, jueces y speaker sincronizados' },
-            { val: 'Cronómetro', sub: 'Automático en pantalla pública' },
+            { val: '2 tipos', sub: 'Torneos de batalla y coreografía' },
             { val: '3 formatos', sub: '1vs1 · 2vs2 · 7toSmoke' },
           ].map(s => (
             <div key={s.val} style={{ textAlign: 'center' }}>
@@ -378,34 +383,44 @@ export default function Landing() {
             {[
               {
                 tag: '1VS1',
+                color: '#e94560',
                 title: 'Batalla individual',
                 desc: 'Cada juez vota por un participante o marca empate. Desempate automático. Bracket eliminatorio para cualquier número de clasificados — no tiene que ser potencia de 2.',
                 styles: 'Breaking · Popping · Locking · House · Hip Hop · Waacking · Voguing',
               },
               {
                 tag: '2VS2',
+                color: '#e94560',
                 title: 'Batalla por equipos',
                 desc: 'Los equipos compiten con nombre propio. En la fase de Filtros, los jueces puntúan a cada miembro del equipo por separado (0–5), sumándose la nota del equipo.',
                 styles: 'Breaking · Hip Hop · Popping · Cualquier estilo en pareja',
               },
               {
                 tag: '7TOSMOKE',
+                color: '#e94560',
                 title: 'Formato 7toSmoke',
                 desc: 'Fase de Filtros para clasificar, luego cola dinámica: el ganador se queda en pista, el perdedor va al final. Timer global configurable — gana quien más puntos acumule al acabar el tiempo. Configurable en modo puntos acumulados o racha.',
                 styles: 'Todos los estilos · Especialmente popular en Breaking y Hip Hop',
               },
+              {
+                tag: 'COREOGRAFÍA',
+                color: '#7ecfff',
+                title: 'Competición coreográfica',
+                desc: 'Participantes salen al escenario uno a uno según el orden configurado. Los jueces puntúan cada criterio (técnica, musicalidad, originalidad…) desde el móvil con un deslizador. La pantalla pública muestra quién está en escena — nunca las puntuaciones.',
+                styles: 'Solo · Dúo · Grupo · Minicrew · Megacrew · Todos los estilos',
+              },
             ].map(m => (
               <div key={m.tag} style={{
                 flex: '1 1 360px', maxWidth: '420px',
-                background: 'rgba(255,255,255,0.03)', border: '1px solid #1e1e30',
+                background: 'rgba(255,255,255,0.03)', border: `1px solid ${(m.color || '#e94560')}22`,
                 borderRadius: '14px', padding: '32px 28px',
               }}>
                 <div style={{
                   display: 'inline-block', padding: '4px 12px',
-                  background: 'rgba(233,69,96,0.12)', border: '1px solid rgba(233,69,96,0.3)',
+                  background: `${(m.color || '#e94560')}18`, border: `1px solid ${(m.color || '#e94560')}44`,
                   borderRadius: '6px', marginBottom: '16px',
                 }}>
-                  <span style={{ color: '#e94560', fontWeight: 800, fontSize: '0.85rem', letterSpacing: '0.1em', fontFamily: "'Bebas Neue', sans-serif" }}>
+                  <span style={{ color: m.color || '#e94560', fontWeight: 800, fontSize: '0.85rem', letterSpacing: '0.1em', fontFamily: "'Bebas Neue', sans-serif" }}>
                     {m.tag}
                   </span>
                 </div>
@@ -455,14 +470,14 @@ export default function Landing() {
           ¿Tienes un torneo en mente?
         </h2>
         <p style={{ color: '#666', marginBottom: '32px', fontSize: '1rem', maxWidth: '500px', margin: '0 auto 32px' }}>
-          Cuéntanos tu evento. Te configuramos TAISEN a tu medida y te acompañamos el día del torneo.
+          Cuéntanos tu evento. Te configuramos TAISEN ZEN a tu medida y te acompañamos el día del torneo.
         </p>
         <a href="#contacto" style={{
           padding: '15px 40px',
-          background: 'linear-gradient(135deg, #e94560, #c0392b)',
+          background: 'linear-gradient(135deg, #3b9edd, #1a6fa8)',
           borderRadius: '8px', color: '#fff', fontWeight: 700,
           fontSize: '1rem', textDecoration: 'none', letterSpacing: '0.08em',
-          boxShadow: '0 4px 24px rgba(233,69,96,0.4)',
+          boxShadow: '0 4px 24px rgba(126,207,255,0.3)',
         }}>
           Contactar ahora
         </a>
@@ -475,7 +490,7 @@ export default function Landing() {
             Contacto
           </p>
           <h2 style={{ color: '#f0f0f0', fontSize: 'clamp(1.4rem, 3vw, 2rem)', marginBottom: '12px', letterSpacing: '0.05em', textAlign: 'center' }}>
-            ¿Quieres TAISEN en tu torneo?
+            ¿Quieres TAISEN ZEN en tu torneo?
           </h2>
           <p style={{ color: '#555', marginBottom: '36px', fontSize: '0.9rem', textAlign: 'center', lineHeight: 1.6 }}>
             Cuéntanos tu evento y te configuramos todo. Te respondemos en menos de 24 h.

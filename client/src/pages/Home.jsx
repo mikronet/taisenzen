@@ -290,7 +290,7 @@ export default function Home() {
           opacity: 0,
           animation: 'tagline-in 0.6s ease 0.55s forwards',
         }}>
-          Gestión de Batallas
+          Competiciones de Danza Urbana
         </p>
 
         {/* Divisor decorativo */}
@@ -341,7 +341,9 @@ export default function Home() {
                       <span style={{ color: '#e94560', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.15em' }}>EN VIVO</span>
                     </div>
                     <span style={{ fontWeight: 600, fontSize: '1rem', color: '#f0f0f0' }}>{t.name}</span>
-                    <span style={{ color: '#666', fontSize: '0.8rem', marginLeft: '10px' }}>{t.type}</span>
+                    <span style={{ color: '#666', fontSize: '0.8rem', marginLeft: '10px' }}>
+                      {t.tournament_type === 'coreografia' ? 'Coreografía' : t.type}
+                    </span>
                     {t.current_phase && (
                       <span style={{ color: '#e94560', fontSize: '0.75rem', marginLeft: '8px', letterSpacing: '0.05em' }}>
                         · {t.current_phase}
@@ -349,7 +351,7 @@ export default function Home() {
                     )}
                   </div>
                   <a
-                    href={`/screen/${t.id}`}
+                    href={t.tournament_type === 'coreografia' ? `/coreo-screen/${t.id}` : `/screen/${t.id}`}
                     target="_blank"
                     rel="noreferrer"
                     style={{
