@@ -70,6 +70,7 @@ function ScoreForm({ participant, criteria, judgeId, onSaved, onLoaded }) {
   const [scores, setScores] = useState({}); // { criterionId: value }
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [attempt, setAttempt] = useState(0); // retry counter for UI feedback
   const [error, setError] = useState('');
   const [fetching, setFetching] = useState(true);
 
@@ -101,17 +102,28 @@ function ScoreForm({ participant, criteria, judgeId, onSaved, onLoaded }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true); setError('');
-    try {
-      const payload = criteria.map(c => ({ criterionId: c.id, score: Number(scores[c.id] ?? 0) }));
-      const res = await apiFetch(`${API}/scores`, {
-        method: 'POST',
-        body: JSON.stringify({ participantId: participant.id, scores: payload }),
-      });
-      if (!res.ok) { const d = await res.json(); setError(d.error || 'Error al guardar'); return; }
-      setSaved(true);
-      onSaved(participant.id, scores);
-    } finally { setLoading(false); }
+    setLoading(true); setError(''); setAttempt(0);
+    const payload = criteria.map(c => ({ criterionId: c.id, score: Number(scores[c.id] ?? 0) }));
+    const MAX_RETRIES = 3;
+    for (let i = 0; i <= MAX_RETRIES; i++) {
+      if (i > 0) {
+        setAttempt(i);
+        await new Promise(r => setTimeout(r, 1000 * i)); // 1s, 2s, 3s backoff
+      }
+      try {
+        const res = await apiFetch(`${API}/scores`, {
+          method: 'POST',
+          body: JSON.stringify({ participantId: participant.id, scores: payload }),
+        });
+        if (res.ok) { setSaved(true); onSaved(participant.id, scores); setLoading(false); setAttempt(0); return; }
+        // Client error (4xx) → no point retrying
+        if (res.status < 500) { const d = await res.json(); setError(d.error || 'Error al guardar'); break; }
+      } catch {
+        // Network error → retry unless last attempt
+        if (i === MAX_RETRIES) setError('Error de red. Comprueba tu conexión.');
+      }
+    }
+    setLoading(false); setAttempt(0);
   };
 
   if (fetching) return <div style={{ padding: '40px', textAlign: 'center', color: 'rgba(255,255,255,0.3)' }}>Cargando...</div>;
@@ -155,7 +167,9 @@ function ScoreForm({ participant, criteria, judgeId, onSaved, onLoaded }) {
       })}
       {error && <p style={{ color: 'var(--accent)', marginBottom: '12px', fontSize: '0.9rem' }}>{error}</p>}
       <button type="submit" className="btn-primary" style={{ width: '100%', fontSize: '1rem', padding: '14px' }} disabled={loading}>
-        {loading ? 'Guardando...' : saved ? 'Actualizar puntuaciones' : 'Guardar puntuaciones'}
+        {loading
+          ? attempt > 0 ? `Reintentando (${attempt}/3)...` : 'Guardando...'
+          : saved ? 'Actualizar puntuaciones' : 'Guardar puntuaciones'}
       </button>
       {saved && (
         <p style={{ color: '#34d399', textAlign: 'center', marginTop: '12px', fontSize: '0.9rem', letterSpacing: '0.1em' }}>
@@ -224,7 +238,13 @@ function JudgePanel({ judge, onLogout }) {
 
   useEffect(() => {
     if (!socket) return;
-    const join = () => socket.emit('join:judge', { tournamentId: judge.tournament_id, judgeId: judge.id });
+    let initialConnect = true;
+    const join = () => {
+      socket.emit('join:judge', { tournamentId: judge.tournament_id, judgeId: judge.id });
+      // On reconnection reload data to catch missed on-stage events and score updates
+      if (!initialConnect) { load(); loadGlobalScores(); }
+      initialConnect = false;
+    };
     join();
     socket.on('connect', join);
     socket.on('coreo:on-stage', ({ participant }) => {

@@ -1475,7 +1475,13 @@ export default function CoreoAdmin() {
 
   useEffect(() => {
     if (!socket || !id) return;
-    const join = () => socket.emit('join:admin', Number(id));
+    let initialConnect = true;
+    const join = () => {
+      socket.emit('join:admin', Number(id));
+      // On reconnection (not the first connect) reload all data to catch missed events
+      if (!initialConnect) load();
+      initialConnect = false;
+    };
     join();
     socket.on('connect', join);
     socket.on('coreo:criteria-updated', ({ criteria: c }) => setCriteria(c));

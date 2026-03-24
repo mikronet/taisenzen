@@ -82,6 +82,12 @@ function setupSocket(io) {
         if (!tid || isNaN(tid)) return;
         socket.join(`judge:${tid}`);
         socket.judgeId = judgeId;
+        // Restore on-stage state so judge sidebar recovers after reconnect
+        const onStage = db.prepare(
+          'SELECT id FROM participants WHERE tournament_id = ? AND on_stage = 1 LIMIT 1'
+        ).get(tid);
+        if (onStage) socket.emit('coreo:on-stage', { participant: onStage });
+        else socket.emit('coreo:off-stage');
       } catch (err) {
         console.error('Socket join:judge error:', err.message);
       }
@@ -117,13 +123,15 @@ function setupSocket(io) {
         const tid = Number(tournamentId);
         if (!tid || isNaN(tid)) return;
         socket.join(`admin:${tid}`);
+        // Restore on-stage state so admin/organizer panel recovers after reconnect
+        const onStage = db.prepare(
+          'SELECT id FROM participants WHERE tournament_id = ? AND on_stage = 1 LIMIT 1'
+        ).get(tid);
+        if (onStage) socket.emit('coreo:on-stage', { participant: onStage });
+        else socket.emit('coreo:off-stage');
       } catch (err) {
         console.error('Socket join:admin error:', err.message);
       }
-    });
-
-    socket.on('disconnect', () => {
-      socket.rooms.forEach(room => socket.leave(room));
     });
   });
 }
