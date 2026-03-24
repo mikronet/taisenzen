@@ -6,7 +6,7 @@ const API = '/api/coreo';
 // Landing page for organizers: they enter their code and get redirected
 // to the CoreoAdmin panel for their specific tournament.
 export default function CoreoOrganizer() {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => new URLSearchParams(window.location.search).get('code') || '');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();

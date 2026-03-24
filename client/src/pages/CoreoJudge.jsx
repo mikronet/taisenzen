@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../hooks/useSocket';
 
 const API = '/api/coreo-judge';
@@ -66,7 +66,7 @@ function JudgeLogin({ onLogin }) {
 }
 
 // ── Score form for one participant ────────────────────────────────────────────
-function ScoreForm({ participant, criteria, judgeId, onSaved }) {
+function ScoreForm({ participant, criteria, judgeId, onSaved, onLoaded }) {
   const [scores, setScores] = useState({}); // { criterionId: value }
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -75,16 +75,16 @@ function ScoreForm({ participant, criteria, judgeId, onSaved }) {
 
   useEffect(() => {
     setSaved(false); setError(''); setFetching(true);
-    // Load existing scores for this participant
     apiFetch(`${API}/scores/${judgeId}/${participant.id}`)
       .then(r => r.json())
       .then(data => {
         const map = {};
         (data.scores || []).forEach(s => { map[s.criterion_id] = s.score; });
-        // Pre-fill with 0 for any missing criteria
         criteria.forEach(c => { if (!(c.id in map)) map[c.id] = 0; });
         setScores(map);
-        setSaved(data.scores?.length > 0);
+        const hasSaved = data.scores?.length > 0;
+        setSaved(hasSaved);
+        if (onLoaded) onLoaded(participant.id, map, hasSaved);
       })
       .catch(() => {
         const map = {};
@@ -92,7 +92,7 @@ function ScoreForm({ participant, criteria, judgeId, onSaved }) {
         setScores(map);
       })
       .finally(() => setFetching(false));
-  }, [participant.id, judgeId, criteria]);
+  }, [participant.id, judgeId, criteria]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (criterionId, value) => {
     setSaved(false);
@@ -110,7 +110,7 @@ function ScoreForm({ participant, criteria, judgeId, onSaved }) {
       });
       if (!res.ok) { const d = await res.json(); setError(d.error || 'Error al guardar'); return; }
       setSaved(true);
-      onSaved(participant.id);
+      onSaved(participant.id, scores);
     } finally { setLoading(false); }
   };
 
@@ -172,6 +172,7 @@ function JudgePanel({ judge, onLogout }) {
   const [state, setState] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [savedIds, setSavedIds] = useState(new Set());
+  const [participantScores, setParticipantScores] = useState({}); // { pid: { criterionId: score } }
   const [onStageId, setOnStageId] = useState(null);
   const [glowing, setGlowing] = useState(false); // triggers glow burst on new on-stage event
   const itemRefs = useRef({}); // participantId → DOM button ref
@@ -211,15 +212,28 @@ function JudgePanel({ judge, onLogout }) {
     join();
     socket.on('connect', join);
     socket.on('coreo:on-stage', ({ participant }) => {
+      // Update on_stage flag in participant list
+      setState(prev => prev ? {
+        ...prev,
+        participants: prev.participants.map(p => ({ ...p, on_stage: p.id === participant.id ? 1 : 0 })),
+      } : prev);
       setOnStageId(participant.id);
       setSelectedId(participant.id); // auto-navigate to on-stage participant
       // Trigger glow burst animation
       setGlowing(false);
       setTimeout(() => setGlowing(true), 10);
     });
+    socket.on('coreo:off-stage', () => {
+      setState(prev => prev ? {
+        ...prev,
+        participants: prev.participants.map(p => ({ ...p, on_stage: 0 })),
+      } : prev);
+      setOnStageId(null);
+    });
     return () => {
       socket.off('connect', join);
       socket.off('coreo:on-stage');
+      socket.off('coreo:off-stage');
     };
   }, [socket, judge]);
 
@@ -241,65 +255,116 @@ function JudgePanel({ judge, onLogout }) {
       <div style={{ display: 'flex', height: 'calc(100vh - 57px)' }}>
         {/* Sidebar: participant list */}
         <div ref={sidebarRef} style={{ width: '200px', borderRight: '1px solid #1a1a2e', overflowY: 'auto', flexShrink: 0 }}>
-          {state.participants.map((p, i) => {
-            const isSelected = p.id === selectedId;
-            const isSaved = savedIds.has(p.id);
-            const isOnStage = p.id === onStageId;
-            return (
-              <button
-                key={p.id}
-                ref={el => { itemRefs.current[p.id] = el; }}
-                onClick={() => setSelectedId(p.id)}
-                style={{
-                  width: '100%', padding: '12px', textAlign: 'left',
-                  background: isOnStage
-                    ? 'rgba(126,207,255,0.1)'
-                    : isSelected ? 'rgba(126,207,255,0.05)' : 'none',
-                  border: 'none', borderBottom: '1px solid #1a1a2e', cursor: 'pointer',
-                  borderLeft: isOnStage
-                    ? '3px solid #7ecfff'
-                    : isSelected ? '3px solid rgba(126,207,255,0.4)' : '3px solid transparent',
-                  transition: 'background 0.2s, box-shadow 0.3s',
-                  boxShadow: isOnStage && glowing
-                    ? 'inset 0 0 18px rgba(126,207,255,0.18), inset 3px 0 12px rgba(126,207,255,0.3)'
-                    : 'none',
-                  animation: isOnStage && glowing ? 'sidebarGlow 2.5s ease-out forwards' : 'none',
-                  position: 'relative',
-                }}
-              >
-                {/* Glow bar on the left edge when on stage */}
-                {isOnStage && (
-                  <span style={{
-                    position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px',
-                    background: '#7ecfff',
-                    boxShadow: '0 0 8px #7ecfff, 0 0 16px #7ecfff',
-                    animation: glowing ? 'glowBar 2.5s ease-out forwards' : 'none',
-                  }} />
-                )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  <span style={{ color: isOnStage ? 'rgba(126,207,255,0.6)' : 'rgba(255,255,255,0.3)', fontSize: '0.7rem' }}>{i + 1}.</span>
-                  {isOnStage && (
-                    <span style={{
-                      width: '7px', height: '7px', borderRadius: '50%',
-                      background: '#7ecfff', display: 'inline-block', flexShrink: 0,
-                      boxShadow: '0 0 6px #7ecfff, 0 0 12px #7ecfff',
-                      animation: 'dotPulse 1.5s ease-in-out infinite',
-                    }} />
-                  )}
-                  {isSaved && <span style={{ color: '#34d399', fontSize: '0.65rem' }}>✓</span>}
+          {(() => {
+            // Rank map: position within same round+category by avg score
+            const pidInfo = {};
+            state.participants.forEach(p => { pidInfo[p.id] = { round: p.round_number || 1, cat: p.category || '' }; });
+            const groups = {};
+            Object.entries(participantScores).forEach(([pid, sc]) => {
+              const vals = Object.values(sc);
+              const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+              if (avg == null) return;
+              const info = pidInfo[Number(pid)];
+              if (!info) return;
+              const key = `${info.round}|${info.cat}`;
+              if (!groups[key]) groups[key] = [];
+              groups[key].push({ pid: Number(pid), avg });
+            });
+            const rankMap = {};
+            Object.values(groups).forEach(entries => {
+              entries.sort((a, b) => b.avg - a.avg);
+              entries.forEach((e, i) => { rankMap[e.pid] = i + 1; });
+            });
+
+            const sorted = [...state.participants].sort((a, b) => (a.act_order ?? 9999) - (b.act_order ?? 9999));
+            const roundMap = {}; const roundOrder = [];
+            for (const p of sorted) {
+              const r = p.round_number || 1;
+              if (!roundMap[r]) { roundMap[r] = []; roundOrder.push(r); }
+              roundMap[r].push(p);
+            }
+            let counter = 0;
+            return roundOrder.map(r => (
+              <div key={r}>
+                <div style={{ padding: '6px 12px', fontSize: '0.65rem', letterSpacing: '0.18em', color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", background: 'rgba(126,207,255,0.05)', borderBottom: '1px solid #1a1a2e' }}>
+                  BLOQUE {r}
                 </div>
-                <div style={{
-                  color: isOnStage ? '#fff' : isSelected ? '#fff' : 'rgba(255,255,255,0.65)',
-                  fontSize: '0.85rem', marginTop: '2px', lineHeight: 1.3,
-                  fontWeight: isOnStage ? 700 : 400,
-                  textShadow: isOnStage && glowing ? '0 0 8px rgba(126,207,255,0.5)' : 'none',
-                }}>{p.name}</div>
-                <div style={{ color: categoryColor(p.category), fontSize: '0.65rem', letterSpacing: '0.1em', marginTop: '3px' }}>
-                  {p.category}{p.age_group ? ` · ${p.age_group}` : ''}
-                </div>
-              </button>
-            );
-          })}
+                {roundMap[r].map(p => {
+                  counter++;
+                  const pos = counter;
+                  const isSelected = p.id === selectedId;
+                  const isSaved = savedIds.has(p.id);
+                  const isOnStage = p.id === onStageId;
+                  return (
+                    <button
+                      key={p.id}
+                      ref={el => { itemRefs.current[p.id] = el; }}
+                      onClick={() => setSelectedId(p.id)}
+                      style={{
+                        width: '100%', padding: '12px', textAlign: 'left',
+                        background: isOnStage
+                          ? 'rgba(126,207,255,0.1)'
+                          : isSelected ? 'rgba(126,207,255,0.05)' : 'none',
+                        border: 'none', borderBottom: '1px solid #1a1a2e', cursor: 'pointer',
+                        borderLeft: isOnStage
+                          ? '3px solid #7ecfff'
+                          : isSelected ? '3px solid rgba(126,207,255,0.4)' : '3px solid transparent',
+                        transition: 'background 0.2s, box-shadow 0.3s',
+                        boxShadow: isOnStage && glowing
+                          ? 'inset 0 0 18px rgba(126,207,255,0.18), inset 3px 0 12px rgba(126,207,255,0.3)'
+                          : 'none',
+                        animation: isOnStage && glowing ? 'sidebarGlow 2.5s ease-out forwards' : 'none',
+                        position: 'relative',
+                      }}
+                    >
+                      {isOnStage && (
+                        <span style={{
+                          position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px',
+                          background: '#7ecfff',
+                          boxShadow: '0 0 8px #7ecfff, 0 0 16px #7ecfff',
+                          animation: glowing ? 'glowBar 2.5s ease-out forwards' : 'none',
+                        }} />
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ color: isOnStage ? 'rgba(126,207,255,0.6)' : 'rgba(255,255,255,0.3)', fontSize: '0.7rem' }}>{pos}.</span>
+                        {isOnStage && (
+                          <span style={{
+                            width: '7px', height: '7px', borderRadius: '50%',
+                            background: '#7ecfff', display: 'inline-block', flexShrink: 0,
+                            boxShadow: '0 0 6px #7ecfff, 0 0 12px #7ecfff',
+                            animation: 'dotPulse 1.5s ease-in-out infinite',
+                          }} />
+                        )}
+                        {isSaved && <span style={{ color: '#34d399', fontSize: '0.65rem' }}>✓</span>}
+                      </div>
+                      <div style={{
+                        color: isOnStage ? '#fff' : isSelected ? '#fff' : 'rgba(255,255,255,0.65)',
+                        fontSize: '0.85rem', marginTop: '2px', lineHeight: 1.3,
+                        fontWeight: isOnStage ? 700 : 400,
+                        textShadow: isOnStage && glowing ? '0 0 8px rgba(126,207,255,0.5)' : 'none',
+                      }}>{p.name}</div>
+                      <div style={{ color: categoryColor(p.category), fontSize: '0.65rem', letterSpacing: '0.1em', marginTop: '3px' }}>
+                        {p.category}{p.age_group ? ` · ${p.age_group}` : ''}
+                      </div>
+                      {(() => {
+                        const ps = participantScores[p.id];
+                        if (!ps || !state.criteria.length) return null;
+                        const vals = Object.values(ps);
+                        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+                        const rank = rankMap[p.id];
+                        return (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '3px' }}>
+                            {rank != null && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem', fontWeight: 700 }}>#{rank}</span>}
+                            <span style={{ color: '#7ecfff', fontSize: '0.7rem', fontWeight: 700 }}>ø {avg.toFixed(1)}</span>
+                          </div>
+                        );
+                      })()}
+                    </button>
+                  );
+                })}
+              </div>
+            ));
+          })()}
         </div>
 
         {/* Main area */}
@@ -346,7 +411,14 @@ function JudgePanel({ judge, onLogout }) {
                   participant={selected}
                   criteria={state.criteria}
                   judgeId={judge.id}
-                  onSaved={(id) => setSavedIds(prev => new Set(prev).add(id))}
+                  onSaved={(pid, scores) => {
+                    setSavedIds(prev => new Set(prev).add(pid));
+                    setParticipantScores(prev => ({ ...prev, [pid]: scores }));
+                  }}
+                  onLoaded={(pid, scores, hasSaved) => {
+                    setParticipantScores(prev => ({ ...prev, [pid]: scores }));
+                    if (hasSaved) setSavedIds(prev => new Set(prev).add(pid));
+                  }}
                 />
               )}
             </div>

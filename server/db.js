@@ -243,6 +243,7 @@ async function initDb() {
     "ALTER TABLE tournaments ADD COLUMN coreo_rounds INTEGER DEFAULT 1",
     // Per-participant round assignment
     "ALTER TABLE participants ADD COLUMN round_number INTEGER DEFAULT 1",
+    "ALTER TABLE tournaments ADD COLUMN poster_path TEXT DEFAULT NULL",
   ];
   for (const sql of migrations) {
     try { db.run(sql); } catch (e) { /* column already exists */ }

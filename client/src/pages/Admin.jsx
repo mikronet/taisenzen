@@ -65,6 +65,8 @@ function TournamentList({ onLogout }) {
   const [name, setName] = useState('');
   const [type, setType] = useState('1vs1');
   const [tournamentType, setTournamentType] = useState('bracket');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
@@ -77,12 +79,27 @@ function TournamentList({ onLogout }) {
   const create = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-    await apiFetch(`${API}/tournaments`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, type, tournament_type: tournamentType })
-    });
-    setName('');
-    load();
+    setCreating(true);
+    setCreateError('');
+    try {
+      const res = await apiFetch(`${API}/tournaments`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), type, tournament_type: tournamentType })
+      });
+      const data = await res.json();
+      if (!res.ok) { setCreateError(data.error || 'Error al crear el torneo'); return; }
+      setName('');
+      // For coreografía, navigate directly to its admin panel
+      if (tournamentType === 'coreografia') {
+        navigate(`/coreo-admin/${data.id}`);
+      } else {
+        load();
+      }
+    } catch {
+      setCreateError('Error de conexión con el servidor');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const remove = async (id) => {
@@ -124,8 +141,11 @@ function TournamentList({ onLogout }) {
             <option value="teams">Equipos</option>
           </select>
         )}
-        <button type="submit" className="btn-primary">Crear</button>
+        <button type="submit" className="btn-primary" disabled={creating}>
+          {creating ? 'Creando...' : 'Crear'}
+        </button>
       </form>
+      {createError && <p style={{ color: 'var(--accent)', fontSize: '0.85rem', marginBottom: '12px' }}>{createError}</p>}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {tournaments.map(t => (

@@ -106,7 +106,70 @@ function SaveStatus({ dirty, saved }) {
 }
 
 // ── CONFIG tab (criteria + categories + rounds) ───────────────────────────────
-function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpdateTournament }) {
+function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpdateTournament, judges, organizers, onUpdateJudges, onUpdateOrganizers, isAdmin }) {
+  // ── QR modal ──
+  const [qrModal, setQrModal] = useState(null);
+
+  // ── Judges ──
+  const [newJudge, setNewJudge] = useState('');
+  const addJudge = async (e) => {
+    e.preventDefault();
+    if (!newJudge.trim()) return;
+    const res = await apiFetch(`${API}/tournaments/${tournamentId}/judges`, {
+      method: 'POST', body: JSON.stringify({ name: newJudge.trim() }),
+    });
+    const data = await res.json();
+    setNewJudge('');
+    onUpdateJudges([...judges, data.judge]);
+  };
+  const removeJudge = async (jid) => {
+    if (!confirm('¿Eliminar este juez?')) return;
+    await apiFetch(`${API}/judges/${jid}`, { method: 'DELETE' });
+    onUpdateJudges(judges.filter(j => j.id !== jid));
+  };
+
+  // ── Organizers ──
+  const [newOrganizer, setNewOrganizer] = useState('');
+  const selfOrgCode = sessionStorage.getItem('coreoOrgCode');
+  const addOrganizer = async (e) => {
+    e.preventDefault();
+    if (!newOrganizer.trim()) return;
+    const res = await apiFetch(`${API}/tournaments/${tournamentId}/organizers`, {
+      method: 'POST', body: JSON.stringify({ name: newOrganizer.trim() }),
+    });
+    const data = await res.json();
+    setNewOrganizer('');
+    onUpdateOrganizers([...organizers, data.organizer]);
+  };
+  const removeOrganizer = async (oid) => {
+    if (!confirm('¿Eliminar este organizador?')) return;
+    await apiFetch(`${API}/organizers/${oid}`, { method: 'DELETE' });
+    onUpdateOrganizers(organizers.filter(o => o.id !== oid));
+  };
+
+  // ── Poster ──
+  const [posterUploading, setPosterUploading] = useState(false);
+  const posterRef = useRef();
+
+  const handlePosterChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPosterUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('poster', file);
+      const res = await apiUpload(`${API}/tournaments/${tournamentId}/poster`, fd);
+      const data = await res.json();
+      if (res.ok) onUpdateTournament({ poster_path: data.poster_path });
+    } finally { setPosterUploading(false); e.target.value = ''; }
+  };
+
+  const deletePoster = async () => {
+    if (!confirm('¿Eliminar el cartel?')) return;
+    const res = await apiFetch(`${API}/tournaments/${tournamentId}/poster`, { method: 'DELETE' });
+    if (res.ok) onUpdateTournament({ poster_path: null });
+  };
+
   // ── Criteria dirty/saved state ──
   const [criteriaDirty, setCriteriaDirty] = useState(false);
   const [criteriaSaved, setCriteriaSaved] = useState(false);
@@ -189,86 +252,200 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
   };
 
   return (
-    <div>
-      {/* ── Scoring criteria ── */}
-      <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>CRITERIOS DE PUNTUACIÓN</h3>
-      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Define los criterios con los que los jueces puntuarán cada actuación.</p>
-      {criteriaList.map((c, i) => (
-        <div key={c.id ?? i} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+    <>
+    {/* QR modal */}
+    {qrModal && (
+      <div onClick={() => setQrModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: '#111827', borderRadius: '12px', padding: '32px', textAlign: 'center', border: '1px solid #333', maxWidth: '340px', width: '100%' }}>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', letterSpacing: '0.12em', marginBottom: '16px' }}>{qrModal.label}</p>
+          <div style={{ background: '#fff', display: 'inline-block', padding: '12px', borderRadius: '8px' }}>
+            <QRCodeSVG value={qrModal.url} size={220} />
+          </div>
+          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem', marginTop: '14px', wordBreak: 'break-all' }}>{qrModal.url}</p>
+          <button onClick={() => setQrModal(null)} className="btn-danger" style={{ marginTop: '18px', padding: '8px 24px' }}>Cerrar</button>
+        </div>
+      </div>
+    )}
+
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
+      {/* ── Left column: event config ── */}
+      <div>
+        {/* Rounds */}
+        <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>NÚMERO DE BLOQUES</h3>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Los participantes se asignan a una bloque. El orden de actuación se agrupa: Bloque → Categoría → Participante.</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <input
-            placeholder={`Criterio ${i + 1} (ej: Técnica, Expresión...)`}
-            value={c.name}
-            onChange={e => updateCriterion(i, 'name', e.target.value)}
+            type="number" min={1} max={20}
+            value={rounds}
+            onChange={e => { setRounds(Math.max(1, Number(e.target.value) || 1)); markConfigDirty(); }}
+            style={{ width: '80px' }}
+          />
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
+            {rounds === 1 ? '1 bloque' : `${rounds} bloques`}
+          </span>
+        </div>
+
+        {SECTION_DIVIDER}
+
+        {/* Categories */}
+        <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>CATEGORÍAS</h3>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Crea las categorías de este evento. El orden aquí determina el orden en los desplegables.</p>
+        <form onSubmit={addCategory} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input
+            placeholder="Nueva categoría (ej: Solo, Parejas, Grupo...)"
+            value={newCat}
+            onChange={e => setNewCat(e.target.value)}
             style={{ flex: 1 }}
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>0 –</span>
-            <input
-              type="number" min={1} max={100} step={0.5}
-              value={c.max_score}
-              onChange={e => updateCriterion(i, 'max_score', e.target.value)}
-              style={{ width: '70px' }}
-            />
-          </div>
-          <button onClick={() => removeCriterion(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }}>✕</button>
+          <button type="submit" className="btn-secondary">+ Añadir</button>
+        </form>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+          {catList.length === 0 && <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Sin categorías definidas.</p>}
+          {catList.map((cat, i) => (
+            <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '8px 12px' }}>
+              <span style={{ flex: 1, color: categoryColor(cat), fontWeight: 600 }}>{cat}</span>
+              <button onClick={() => moveCategoryItem(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid #333', color: i === 0 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '2px 7px', cursor: i === 0 ? 'default' : 'pointer', fontSize: '0.8rem' }}>↑</button>
+              <button onClick={() => moveCategoryItem(i, 1)} disabled={i === catList.length - 1} style={{ background: 'none', border: '1px solid #333', color: i === catList.length - 1 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '2px 7px', cursor: i === catList.length - 1 ? 'default' : 'pointer', fontSize: '0.8rem' }}>↓</button>
+              <button onClick={() => removeCategory(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '2px 7px', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>
+            </div>
+          ))}
         </div>
-      ))}
-      <div style={{ display: 'flex', gap: '10px', marginTop: '12px', alignItems: 'center' }}>
-        <button onClick={addCriterion} className="btn-secondary">+ Añadir criterio</button>
-        <button onClick={saveCriteria} className="btn-primary" disabled={savingCriteria}>{savingCriteria ? 'Guardando...' : 'Guardar criterios'}</button>
-        <SaveStatus dirty={criteriaDirty} saved={criteriaSaved} />
-      </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button onClick={saveConfig} className="btn-primary" disabled={savingConfig}>
+            {savingConfig ? 'Guardando...' : 'Guardar categorías y bloques'}
+          </button>
+          <SaveStatus dirty={configDirty} saved={configSaved} />
+        </div>
 
-      {SECTION_DIVIDER}
+        {SECTION_DIVIDER}
 
-      {/* ── Categories ── */}
-      <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>CATEGORÍAS</h3>
-      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Crea las categorías de este evento. El orden aquí determina el orden en los desplegables.</p>
-      <form onSubmit={addCategory} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-        <input
-          placeholder="Nueva categoría (ej: Solo, Parejas, Grupo...)"
-          value={newCat}
-          onChange={e => setNewCat(e.target.value)}
-          style={{ flex: 1 }}
-        />
-        <button type="submit" className="btn-secondary">+ Añadir</button>
-      </form>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-        {catList.length === 0 && <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Sin categorías definidas.</p>}
-        {catList.map((cat, i) => (
-          <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '8px 12px' }}>
-            <span style={{ flex: 1, color: categoryColor(cat), fontWeight: 600 }}>{cat}</span>
-            <button onClick={() => moveCategoryItem(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid #333', color: i === 0 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '2px 7px', cursor: i === 0 ? 'default' : 'pointer', fontSize: '0.8rem' }}>↑</button>
-            <button onClick={() => moveCategoryItem(i, 1)} disabled={i === catList.length - 1} style={{ background: 'none', border: '1px solid #333', color: i === catList.length - 1 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '2px 7px', cursor: i === catList.length - 1 ? 'default' : 'pointer', fontSize: '0.8rem' }}>↓</button>
-            <button onClick={() => removeCategory(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '2px 7px', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>
+        {/* Criteria */}
+        <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>CRITERIOS DE PUNTUACIÓN</h3>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Define los criterios con los que los jueces puntuarán cada actuación.</p>
+        {criteriaList.map((c, i) => (
+          <div key={c.id ?? i} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+            <input
+              placeholder={`Criterio ${i + 1} (ej: Técnica, Expresión...)`}
+              value={c.name}
+              onChange={e => updateCriterion(i, 'name', e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>0 –</span>
+              <input
+                type="number" min={1} max={100} step={0.5}
+                value={c.max_score}
+                onChange={e => updateCriterion(i, 'max_score', e.target.value)}
+                style={{ width: '70px' }}
+              />
+            </div>
+            <button onClick={() => removeCriterion(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }}>✕</button>
           </div>
         ))}
+        <div style={{ display: 'flex', gap: '10px', marginTop: '12px', alignItems: 'center' }}>
+          <button onClick={addCriterion} className="btn-secondary">+ Añadir criterio</button>
+          <button onClick={saveCriteria} className="btn-primary" disabled={savingCriteria}>{savingCriteria ? 'Guardando...' : 'Guardar criterios'}</button>
+          <SaveStatus dirty={criteriaDirty} saved={criteriaSaved} />
+        </div>
+
+        {SECTION_DIVIDER}
+
+        {/* Poster */}
+        <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>CARTEL DEL TORNEO</h3>
+        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Imagen que aparece de fondo en la pantalla pública.</p>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '8px' }}>
+          {tournament.poster_path ? (
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <img
+                src={`/uploads/${tournament.poster_path}`}
+                alt="Cartel"
+                style={{ width: '120px', height: '160px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #2a2a3e', display: 'block' }}
+              />
+              <button
+                onClick={deletePoster}
+                style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.7)', border: '1px solid #444', color: '#888', borderRadius: '4px', padding: '2px 7px', cursor: 'pointer', fontSize: '0.75rem' }}
+              >✕</button>
+            </div>
+          ) : (
+            <div
+              onClick={() => posterRef.current.click()}
+              style={{ width: '120px', height: '160px', borderRadius: '8px', border: '2px dashed #333', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', flexShrink: 0 }}
+            >
+              <span style={{ color: '#444', fontSize: '1.5rem' }}>🖼</span>
+              <span style={{ color: '#555', fontSize: '0.7rem', textAlign: 'center', lineHeight: 1.4 }}>Sin cartel</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'center' }}>
+            <button className="btn-secondary" style={{ fontSize: '0.8rem' }} disabled={posterUploading} onClick={() => posterRef.current.click()}>
+              {posterUploading ? 'Subiendo...' : tournament.poster_path ? 'Cambiar cartel' : 'Subir cartel'}
+            </button>
+            <input type="file" ref={posterRef} accept="image/*" onChange={handlePosterChange} style={{ display: 'none' }} />
+          </div>
+        </div>
       </div>
 
-      {SECTION_DIVIDER}
+      {/* ── Right column: judges + organizers ── */}
+      <div>
+        {/* Judges */}
+        <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>JUECES</h3>
+        {isAdmin && (
+          <form onSubmit={addJudge} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <input placeholder="Nombre del juez" value={newJudge} onChange={e => setNewJudge(e.target.value)} style={{ flex: 1 }} />
+            <button type="submit" className="btn-primary">Crear</button>
+          </form>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {judges.map(j => (
+            <div key={j.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{j.name}</div>
+                <div style={{ color: '#7ecfff', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: '3px' }}>{j.access_code}</div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-judge?code=${j.access_code}`, label: `JURADO · ${j.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#7ecfff' }}>QR</button>
+                <button onClick={() => window.open(`${window.location.origin}/coreo-judge?code=${j.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#7ecfff' }}>🔗</button>
+                {isAdmin && <button className="btn-danger" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => removeJudge(j.id)}>Eliminar</button>}
+              </div>
+            </div>
+          ))}
+          {judges.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', padding: '10px 0' }}>Sin jueces.</p>}
+        </div>
+        <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(126,207,255,0.04)', borderRadius: '8px', border: '1px solid rgba(126,207,255,0.1)' }}>
+          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>Acceso en <strong style={{ color: '#7ecfff' }}>/coreo-judge</strong></p>
+        </div>
 
-      {/* ── Rounds ── */}
-      <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>NÚMERO DE RONDAS</h3>
-      <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Los participantes se asignan a una ronda. El orden de actuación se agrupa: Ronda → Categoría → Participante.</p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <input
-          type="number" min={1} max={20}
-          value={rounds}
-          onChange={e => { setRounds(Math.max(1, Number(e.target.value) || 1)); markConfigDirty(); }}
-          style={{ width: '80px' }}
-        />
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
-          {rounds === 1 ? '1 ronda' : `${rounds} rondas`}
-        </span>
-      </div>
+        {isAdmin && (<>
+          {SECTION_DIVIDER}
 
-      <div style={{ marginTop: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <button onClick={saveConfig} className="btn-primary" disabled={savingConfig}>
-          {savingConfig ? 'Guardando...' : 'Guardar categorías y rondas'}
-        </button>
-        <SaveStatus dirty={configDirty} saved={configSaved} />
+          {/* Organizers */}
+          <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>ORGANIZADORES</h3>
+          <form onSubmit={addOrganizer} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <input placeholder="Nombre del organizador" value={newOrganizer} onChange={e => setNewOrganizer(e.target.value)} style={{ flex: 1 }} />
+            <button type="submit" className="btn-primary">Crear</button>
+          </form>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {organizers.map(o => (
+              <div key={o.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{o.name}</div>
+                  <div style={{ color: '#a78bfa', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: '3px' }}>{o.access_code}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-organizer?code=${o.access_code}`, label: `ORGANIZADOR · ${o.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#a78bfa' }}>QR</button>
+                  <button onClick={() => window.open(`${window.location.origin}/coreo-organizer?code=${o.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#a78bfa' }}>🔗</button>
+                  {o.access_code !== selfOrgCode && <button className="btn-danger" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => removeOrganizer(o.id)}>Eliminar</button>}
+                </div>
+              </div>
+            ))}
+            {organizers.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', padding: '10px 0' }}>Sin organizadores.</p>}
+          </div>
+          <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(167,139,250,0.04)', borderRadius: '8px', border: '1px solid rgba(167,139,250,0.1)' }}>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>El organizador accede en <strong style={{ color: '#a78bfa' }}>/coreo-organizer</strong> con su código</p>
+          </div>
+        </>)}
       </div>
     </div>
+    </>
   );
 }
 
@@ -347,7 +524,7 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
             </select>
             <select value={roundNumber} onChange={e => setRoundNumber(Number(e.target.value))} style={{ flex: 1 }}>
               {Array.from({ length: rounds }, (_, i) => i + 1).map(r => (
-                <option key={r} value={r}>Ronda {r}</option>
+                <option key={r} value={r}>Bloque {r}</option>
               ))}
             </select>
           </div>
@@ -431,7 +608,7 @@ function ParticipantsTab({ tournamentId, participants, onUpdate, categories, rou
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700 }}>{p.name}</div>
                   <div style={{ display: 'flex', gap: '8px', marginTop: '3px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ color: '#7ecfff', fontSize: '0.65rem', letterSpacing: '0.08em' }}>Ronda {p.round_number || 1}</span>
+                    <span style={{ color: '#7ecfff', fontSize: '0.65rem', letterSpacing: '0.08em' }}>Bloque {p.round_number || 1}</span>
                     {p.category && <span style={{ color: categoryColor(p.category), fontSize: '0.7rem', letterSpacing: '0.1em', fontWeight: 700 }}>{p.category}</span>}
                   </div>
                   <div style={{ display: 'flex', gap: '12px', marginTop: '3px', flexWrap: 'wrap' }}>
@@ -607,7 +784,7 @@ function OrderTab({ tournamentId, participants, onUpdate }) {
               />
               <div style={{ flex: 1 }}>
                 <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.15em', fontFamily: "'Bebas Neue', sans-serif" }}>
-                  RONDA {rnd.round_number}
+                  BLOQUE {rnd.round_number}
                 </span>
                 <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem', marginLeft: '10px' }}>
                   {rnd.categories.reduce((n, c) => n + c.participants.length, 0)} participantes
@@ -647,10 +824,16 @@ function OrderTab({ tournamentId, participants, onUpdate }) {
                           display: 'flex', gap: '10px', alignItems: 'center',
                           background: '#0f0f1a', borderRadius: '6px', padding: '8px 12px',
                         }}>
-                          <span style={{
-                            color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif",
-                            fontSize: '1.2rem', minWidth: '28px', textAlign: 'center', lineHeight: 1,
-                          }}>{pos}</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '28px', gap: '2px' }}>
+                            <span style={{
+                              color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif",
+                              fontSize: '1.2rem', textAlign: 'center', lineHeight: 1,
+                            }}>{pos}</span>
+                            <span style={{
+                              color: categoryColor(cat.category), fontSize: '0.62rem',
+                              fontWeight: 700, letterSpacing: '0.05em', lineHeight: 1,
+                            }}>{pi + 1}</span>
+                          </div>
                           {p.photo_path
                             ? <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
                             : <div style={{ width: '38px', height: '38px', borderRadius: '5px', background: '#1a1a2e', flexShrink: 0 }} />
@@ -682,14 +865,20 @@ function OrderTab({ tournamentId, participants, onUpdate }) {
 }
 
 // ── LIVE tab ──────────────────────────────────────────────────────────────────
-function LiveTab({ tournamentId, participants, judges, organizers, onUpdate, onUpdateJudges, onUpdateOrganizers, isAdmin }) {
+function LiveTab({ tournamentId, participants, onUpdate }) {
   const [onStageId, setOnStageId] = useState(() => participants.find(p => p.on_stage)?.id ?? null);
-  const [newJudge, setNewJudge] = useState('');
-  const [newOrganizer, setNewOrganizer] = useState('');
   const [loading, setLoading] = useState(null);
-  const [qrModal, setQrModal] = useState(null); // { url, label }
 
-  const sorted = [...participants].sort((a, b) => (a.act_order ?? 9999) - (b.act_order ?? 9999));
+  const rounds = (() => {
+    const sorted = [...participants].sort((a, b) => (a.act_order ?? 9999) - (b.act_order ?? 9999));
+    const map = {}; const order = [];
+    for (const p of sorted) {
+      const r = p.round_number || 1;
+      if (!map[r]) { map[r] = []; order.push(r); }
+      map[r].push(p);
+    }
+    return order.map(r => ({ round: r, participants: map[r] }));
+  })();
 
   useEffect(() => {
     setOnStageId(participants.find(p => p.on_stage)?.id ?? null);
@@ -711,168 +900,62 @@ function LiveTab({ tournamentId, participants, judges, organizers, onUpdate, onU
     onUpdate(participants.map(p => ({ ...p, on_stage: 0 })));
   };
 
-  const addJudge = async (e) => {
-    e.preventDefault();
-    if (!newJudge.trim()) return;
-    const res = await apiFetch(`${API}/tournaments/${tournamentId}/judges`, {
-      method: 'POST', body: JSON.stringify({ name: newJudge.trim() }),
-    });
-    const data = await res.json();
-    setNewJudge('');
-    onUpdateJudges([...judges, data.judge]);
-  };
-
-  const removeJudge = async (jid) => {
-    if (!confirm('¿Eliminar este juez?')) return;
-    await apiFetch(`${API}/judges/${jid}`, { method: 'DELETE' });
-    onUpdateJudges(judges.filter(j => j.id !== jid));
-  };
-
-  const addOrganizer = async (e) => {
-    e.preventDefault();
-    if (!newOrganizer.trim()) return;
-    const res = await apiFetch(`${API}/tournaments/${tournamentId}/organizers`, {
-      method: 'POST', body: JSON.stringify({ name: newOrganizer.trim() }),
-    });
-    const data = await res.json();
-    setNewOrganizer('');
-    onUpdateOrganizers([...organizers, data.organizer]);
-  };
-
-  const removeOrganizer = async (oid) => {
-    if (!confirm('¿Eliminar este organizador?')) return;
-    await apiFetch(`${API}/organizers/${oid}`, { method: 'DELETE' });
-    onUpdateOrganizers(organizers.filter(o => o.id !== oid));
-  };
-
   return (
-    <>
-    {/* QR modal */}
-    {qrModal && (
-      <div onClick={() => setQrModal(null)} style={{
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.88)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000
-      }}>
-        <div onClick={e => e.stopPropagation()} style={{
-          background: '#111827', borderRadius: '12px', padding: '32px',
-          textAlign: 'center', border: '1px solid #333', maxWidth: '340px', width: '100%'
-        }}>
-          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', letterSpacing: '0.12em', marginBottom: '16px' }}>{qrModal.label}</p>
-          <div style={{ background: '#fff', display: 'inline-block', padding: '12px', borderRadius: '8px' }}>
-            <QRCodeSVG value={qrModal.url} size={220} />
-          </div>
-          <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem', marginTop: '14px', wordBreak: 'break-all' }}>{qrModal.url}</p>
-          <button onClick={() => setQrModal(null)} className="btn-danger" style={{ marginTop: '18px', padding: '8px 24px' }}>Cerrar</button>
-        </div>
-      </div>
-    )}
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-      {/* Left: on-stage control */}
-      <div>
+    <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: 0 }}>CONTROL DE ESCENA</h3>
           {onStageId && (
             <button onClick={clearStage} style={{ background: 'none', border: '1px solid #555', color: '#888', fontSize: '0.75rem', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer' }}>Limpiar escena</button>
           )}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {sorted.map((p, i) => {
-            const isOnStage = p.id === onStageId;
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {rounds.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', padding: '20px', textAlign: 'center' }}>No hay participantes.</p>}
+          {rounds.map(({ round, participants: rps }) => {
+            let globalIdx = rounds.slice(0, rounds.indexOf(rounds.find(r => r.round === round))).reduce((n, r) => n + r.participants.length, 0);
             return (
-              <div key={p.id} className="card" style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 16px', border: isOnStage ? '1px solid rgba(126,207,255,0.5)' : '1px solid #1a1a2e', background: isOnStage ? 'rgba(126,207,255,0.06)' : undefined }}>
-                <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: '22px', fontSize: '0.85rem' }}>{i + 1}</span>
-                {p.photo_path && <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{p.name}</div>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
-                    <span style={{ color: categoryColor(p.category), fontSize: '0.65rem', letterSpacing: '0.1em' }}>{p.category}</span>
-                    {p.age_group && <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem' }}>{p.age_group}</span>}
-                  </div>
+              <div key={round}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <span style={{ color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", fontSize: '1rem', letterSpacing: '0.2em' }}>BLOQUE {round}</span>
+                  <span style={{ flex: 1, height: '1px', background: 'rgba(126,207,255,0.15)' }} />
+                  <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.72rem' }}>{rps.length} grupos</span>
                 </div>
-                {isOnStage ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', boxShadow: '0 0 8px #7ecfff', display: 'inline-block' }} />
-                    <span style={{ color: '#7ecfff', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em' }}>EN ESCENA</span>
-                  </div>
-                ) : (
-                  <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '6px 12px' }}
-                    onClick={() => setOnStage(p.id)} disabled={loading === p.id}>
-                    {loading === p.id ? '...' : 'Poner en escena'}
-                  </button>
-                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {rps.map(p => {
+                    globalIdx++;
+                    const isOnStage = p.id === onStageId;
+                    return (
+                      <div key={p.id} className="card" style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 16px', border: isOnStage ? '1px solid rgba(126,207,255,0.5)' : '1px solid #1a1a2e', background: isOnStage ? 'rgba(126,207,255,0.06)' : undefined }}>
+                        <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: '22px', fontSize: '0.85rem' }}>{globalIdx}</span>
+                        {p.photo_path && <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{p.name}</div>
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
+                            <span style={{ color: categoryColor(p.category), fontSize: '0.65rem', letterSpacing: '0.1em' }}>{p.category}</span>
+                          </div>
+                        </div>
+                        {isOnStage ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', boxShadow: '0 0 8px #7ecfff', display: 'inline-block' }} />
+                            <span style={{ color: '#7ecfff', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em' }}>EN ESCENA</span>
+                          </div>
+                        ) : (
+                          <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '6px 12px' }}
+                            onClick={() => setOnStage(p.id)} disabled={loading === p.id}>
+                            {loading === p.id ? '...' : 'Poner en escena'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
-          {sorted.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', padding: '20px', textAlign: 'center' }}>No hay participantes.</p>}
         </div>
-      </div>
-
-      {/* Right: judges + organizers (only admin can manage these) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-        {/* Judges */}
-        <div>
-          <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', marginBottom: '12px' }}>JUECES</h3>
-          {isAdmin && (
-            <form onSubmit={addJudge} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <input placeholder="Nombre del juez" value={newJudge} onChange={e => setNewJudge(e.target.value)} style={{ flex: 1 }} />
-              <button type="submit" className="btn-primary">Crear</button>
-            </form>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {judges.map(j => (
-              <div key={j.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{j.name}</div>
-                  <div style={{ color: '#7ecfff', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: '3px' }}>{j.access_code}</div>
-                </div>
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button
-                    onClick={() => setQrModal({ url: `${window.location.origin}/coreo-judge?code=${j.access_code}`, label: `JURADO · ${j.name}` })}
-                    style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#7ecfff' }}>QR</button>
-                  <button
-                    onClick={() => window.open(`${window.location.origin}/coreo-judge?code=${j.access_code}`, '_blank')}
-                    style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#7ecfff' }}>🔗</button>
-                  {isAdmin && <button className="btn-danger" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => removeJudge(j.id)}>Eliminar</button>}
-                </div>
-              </div>
-            ))}
-            {judges.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', padding: '10px 0' }}>Sin jueces.</p>}
-          </div>
-          <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(126,207,255,0.04)', borderRadius: '8px', border: '1px solid rgba(126,207,255,0.1)' }}>
-            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>Acceso en <strong style={{ color: '#7ecfff' }}>/coreo-judge</strong></p>
-          </div>
-        </div>
-
-        {/* Organizers */}
-        {isAdmin && (
-          <div>
-            <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', marginBottom: '12px' }}>ORGANIZADORES</h3>
-            <form onSubmit={addOrganizer} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <input placeholder="Nombre del organizador" value={newOrganizer} onChange={e => setNewOrganizer(e.target.value)} style={{ flex: 1 }} />
-              <button type="submit" className="btn-primary">Crear</button>
-            </form>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {organizers.map(o => (
-                <div key={o.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{o.name}</div>
-                    <div style={{ color: '#a78bfa', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: '3px' }}>{o.access_code}</div>
-                  </div>
-                  <button className="btn-danger" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => removeOrganizer(o.id)}>Eliminar</button>
-                </div>
-              ))}
-              {organizers.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', padding: '10px 0' }}>Sin organizadores.</p>}
-            </div>
-            <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(167,139,250,0.04)', borderRadius: '8px', border: '1px solid rgba(167,139,250,0.1)' }}>
-              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>El organizador accede en <strong style={{ color: '#a78bfa' }}>/coreo-organizer</strong> con su código</p>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
-    </>
   );
 }
+
 
 // ── Organizer login ───────────────────────────────────────────────────────────
 function OrganizerLogin({ onLogin }) {
@@ -916,6 +999,144 @@ function OrganizerLogin({ onLogin }) {
           Soy administrador →
         </button>
       </form>
+    </div>
+  );
+}
+
+// ── ScoresTab ─────────────────────────────────────────────────────────────────
+function ScoresTab({ tournamentId }) {
+  const socket = useSocket();
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await apiFetch(`/api/coreo/tournaments/${tournamentId}/scores/summary`);
+      const d = await r.json();
+      setData(d);
+    } finally {
+      setLoading(false);
+    }
+  }, [tournamentId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Real-time refresh when any judge saves scores
+  useEffect(() => {
+    if (!socket) return;
+    socket.on('coreo:scores-updated', load);
+    return () => socket.off('coreo:scores-updated', load);
+  }, [socket, load]);
+
+  if (loading) return <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '60px' }}>Cargando...</div>;
+  if (!data) return null;
+
+  const { criteria, participants } = data;
+
+  const getTotal = (p) => {
+    const vals = criteria.map(c => p.criterionScores[c.id]).filter(v => v != null);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+
+  if (!criteria.length) return <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '60px' }}>No hay criterios configurados.</div>;
+  if (!participants.length) return (
+    <div style={{ textAlign: 'center', paddingTop: '60px' }}>
+      <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '2rem', marginBottom: '12px' }}>—</div>
+      <div style={{ color: 'rgba(255,255,255,0.3)' }}>Aún no hay puntuaciones registradas.</div>
+      <button onClick={load} style={{ marginTop: '20px', background: 'none', border: '1px solid #333', color: '#888', fontSize: '0.75rem', padding: '6px 14px', borderRadius: '20px', cursor: 'pointer' }}>↻ Actualizar</button>
+    </div>
+  );
+
+  // Group by round → category (round/cat order by first act_order appearance), sort within category by total desc
+  const roundMap = {}; const roundOrder = [];
+  for (const p of participants) {
+    const r = p.round_number || 1;
+    const cat = p.category || '—';
+    if (!roundMap[r]) { roundMap[r] = {}; roundOrder.push(r); }
+    if (!roundMap[r][cat]) roundMap[r][cat] = [];
+    roundMap[r][cat].push(p);
+  }
+  const grouped = roundOrder.map(r => ({
+    round: r,
+    categories: Object.keys(roundMap[r]).map(cat => ({
+      cat,
+      participants: [...roundMap[r][cat]].sort((a, b) => {
+        const ta = getTotal(a); const tb = getTotal(b);
+        if (ta == null && tb == null) return 0;
+        if (ta == null) return 1; if (tb == null) return -1;
+        return tb - ta;
+      }),
+    })),
+  }));
+
+  const thStyle = { textAlign: 'right', padding: '10px 14px', color: 'rgba(255,255,255,0.4)', fontWeight: 400, whiteSpace: 'nowrap', borderBottom: '1px solid #1a1a2e', fontSize: '0.8rem' };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+        <h2 style={{ margin: 0, fontFamily: "'Bebas Neue', sans-serif", letterSpacing: '0.15em', color: '#7ecfff', fontSize: '1.3rem' }}>
+          PUNTUACIONES <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', fontFamily: 'inherit' }}>({participants.length} grupos)</span>
+        </h2>
+        <button onClick={load} style={{ background: 'none', border: '1px solid #333', color: '#888', fontSize: '0.75rem', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer' }}>↻ Actualizar</button>
+      </div>
+
+      {grouped.map(({ round, categories }) => (
+        <div key={round} style={{ marginBottom: '36px' }}>
+          {/* Round header */}
+          <div style={{ fontFamily: "'Bebas Neue', sans-serif", letterSpacing: '0.2em', color: '#7ecfff', fontSize: '1.1rem', marginBottom: '20px', paddingBottom: '8px', borderBottom: '1px solid rgba(126,207,255,0.2)' }}>
+            BLOQUE {round}
+          </div>
+
+          {categories.map(({ cat, participants: catParts }) => (
+            <div key={cat} style={{ marginBottom: '28px' }}>
+              {/* Category header */}
+              <div style={{ color: categoryColor(cat), fontSize: '0.72rem', letterSpacing: '0.18em', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase' }}>
+                {cat}
+              </div>
+              <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a1a2e' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                  <thead>
+                    <tr style={{ background: '#0f0f1a' }}>
+                      <th style={{ ...thStyle, textAlign: 'left', color: 'rgba(255,255,255,0.3)' }}>#</th>
+                      <th style={{ ...thStyle, textAlign: 'left', color: 'rgba(255,255,255,0.4)' }}>Participante</th>
+                      {criteria.map(c => (
+                        <th key={c.id} style={thStyle}>
+                          {c.name}
+                          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75em', marginLeft: '3px' }}>/{c.max_score}</span>
+                        </th>
+                      ))}
+                      <th style={{ ...thStyle, color: '#7ecfff', fontWeight: 700 }}>TOTAL</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {catParts.map((p, idx) => {
+                      const total = getTotal(p);
+                      return (
+                        <tr key={p.id} style={{ borderBottom: '1px solid #1a1a2e', background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
+                          <td style={{ padding: '10px 14px', color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem' }}>{idx + 1}</td>
+                          <td style={{ padding: '10px 14px', color: '#fff', fontWeight: 500 }}>{p.name}</td>
+                          {criteria.map(c => {
+                            const val = p.criterionScores[c.id];
+                            return (
+                              <td key={c.id} style={{ padding: '10px 14px', textAlign: 'right', color: val != null ? '#e2e8f0' : 'rgba(255,255,255,0.15)' }}>
+                                {val != null ? val.toFixed(2) : '—'}
+                              </td>
+                            );
+                          })}
+                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: total != null ? '#7ecfff' : 'rgba(255,255,255,0.15)' }}>
+                            {total != null ? total.toFixed(2) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -981,12 +1202,14 @@ export default function CoreoAdmin() {
     socket.on('coreo:organizer-removed', ({ id: oid }) => setOrganizers(prev => prev.filter(o => o.id !== oid)));
     socket.on('coreo:on-stage', ({ participant }) => setParticipants(prev => prev.map(p => ({ ...p, on_stage: p.id === participant.id ? 1 : 0 }))));
     socket.on('coreo:off-stage', () => setParticipants(prev => prev.map(p => ({ ...p, on_stage: 0 }))));
+    socket.on('coreo:poster-updated', ({ poster_path }) => setTournament(prev => prev ? { ...prev, poster_path } : prev));
     return () => {
       socket.off('connect', join);
       ['coreo:criteria-updated', 'coreo:config-updated', 'coreo:participant-added',
         'coreo:participant-updated', 'coreo:participant-removed', 'coreo:order-updated',
         'coreo:judge-added', 'coreo:judge-removed', 'coreo:organizer-added',
-        'coreo:organizer-removed', 'coreo:on-stage', 'coreo:off-stage'].forEach(e => socket.off(e));
+        'coreo:organizer-removed', 'coreo:on-stage', 'coreo:off-stage',
+        'coreo:poster-updated'].forEach(e => socket.off(e));
     };
   }, [socket, id, load]);
 
@@ -1014,6 +1237,7 @@ export default function CoreoAdmin() {
         { key: 'participantes', label: `Participantes (${participants.length})` },
         { key: 'orden', label: 'Orden' },
         { key: 'en-vivo', label: 'En vivo' },
+        { key: 'puntuaciones', label: 'Puntuaciones' },
       ]
     : [{ key: 'en-vivo', label: 'En vivo' }];
 
@@ -1070,6 +1294,11 @@ export default function CoreoAdmin() {
             onUpdateCriteria={setCriteria}
             tournament={tournament}
             onUpdateTournament={updates => setTournament(prev => ({ ...prev, ...updates }))}
+            judges={judges}
+            organizers={organizers}
+            onUpdateJudges={setJudges}
+            onUpdateOrganizers={setOrganizers}
+            isAdmin={isAdmin}
           />
         )}
         {activeTab === 'participantes' && (
@@ -1082,16 +1311,12 @@ export default function CoreoAdmin() {
           />
         )}
         {activeTab === 'orden' && <OrderTab tournamentId={Number(id)} participants={participants} onUpdate={setParticipants} />}
+        {activeTab === 'puntuaciones' && <ScoresTab tournamentId={Number(id)} />}
         {activeTab === 'en-vivo' && (
           <LiveTab
             tournamentId={Number(id)}
             participants={participants}
-            judges={judges}
-            organizers={organizers}
             onUpdate={setParticipants}
-            onUpdateJudges={setJudges}
-            onUpdateOrganizers={setOrganizers}
-            isAdmin={isAdmin}
           />
         )}
       </div>

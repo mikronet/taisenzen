@@ -67,6 +67,7 @@ router.post('/scores', requireJudge, (req, res) => {
   });
   txn();
 
+  req.io.to(`admin:${tid}`).emit('coreo:scores-updated');
   res.json({ success: true });
 });
 

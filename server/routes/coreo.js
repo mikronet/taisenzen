@@ -73,6 +73,41 @@ router.get('/tournaments/:id', (req, res) => {
   res.json({ tournament, criteria, participants, judges, organizers });
 });
 
+// ── POST /api/coreo/tournaments/:id/poster ───────────────────────────────────
+router.post('/tournaments/:id/poster', upload.single('poster'), (req, res) => {
+  const tid = Number(req.params.id);
+  const tournament = db.prepare('SELECT poster_path FROM tournaments WHERE id = ?').get(tid);
+  if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
+
+  // Delete old poster if exists
+  if (tournament.poster_path) {
+    const old = path.join(uploadsDir, tournament.poster_path);
+    if (fs.existsSync(old)) fs.unlinkSync(old);
+  }
+
+  const poster_path = req.file ? req.file.filename : null;
+  db.prepare('UPDATE tournaments SET poster_path = ? WHERE id = ?').run(poster_path, tid);
+  req.io.to(`screen:${tid}`).emit('coreo:poster-updated', { poster_path });
+  req.io.to(`admin:${tid}`).emit('coreo:poster-updated', { poster_path });
+  res.json({ success: true, poster_path });
+});
+
+// ── DELETE /api/coreo/tournaments/:id/poster ─────────────────────────────────
+router.delete('/tournaments/:id/poster', (req, res) => {
+  const tid = Number(req.params.id);
+  const tournament = db.prepare('SELECT poster_path FROM tournaments WHERE id = ?').get(tid);
+  if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
+
+  if (tournament.poster_path) {
+    const old = path.join(uploadsDir, tournament.poster_path);
+    if (fs.existsSync(old)) fs.unlinkSync(old);
+  }
+  db.prepare('UPDATE tournaments SET poster_path = NULL WHERE id = ?').run(tid);
+  req.io.to(`screen:${tid}`).emit('coreo:poster-updated', { poster_path: null });
+  req.io.to(`admin:${tid}`).emit('coreo:poster-updated', { poster_path: null });
+  res.json({ success: true });
+});
+
 // ── PUT /api/coreo/tournaments/:id/config ────────────────────────────────────
 router.put('/tournaments/:id/config', (req, res) => {
   const tid = Number(req.params.id);
@@ -236,6 +271,7 @@ router.post('/participants/:id/on-stage', (req, res) => {
   const payload = { participant: onStageData };
   req.io.to(`screen:${tid}`).emit('coreo:on-stage', payload);
   req.io.to(`admin:${tid}`).emit('coreo:on-stage', payload);
+  req.io.to(`judge:${tid}`).emit('coreo:on-stage', payload);
   res.json({ success: true, participant: onStageData });
 });
 
@@ -246,6 +282,7 @@ router.post('/tournaments/:id/off-stage', (req, res) => {
   db.prepare('UPDATE tournaments SET screen_state = ? WHERE id = ?').run(JSON.stringify({ mode: 'idle' }), tid);
   req.io.to(`screen:${tid}`).emit('coreo:off-stage');
   req.io.to(`admin:${tid}`).emit('coreo:off-stage');
+  req.io.to(`judge:${tid}`).emit('coreo:off-stage');
   res.json({ success: true });
 });
 
@@ -323,6 +360,40 @@ router.get('/tournaments/:id/scores/detail', (req, res) => {
     ORDER BY cs.participant_id, cs.judge_id, c.sort_order
   `).all(tid);
   res.json({ detail: rows });
+});
+
+// ── GET /api/coreo/tournaments/:id/scores/summary ────────────────────────────
+// Per-participant per-criterion average scores (across all judges)
+router.get('/tournaments/:id/scores/summary', (req, res) => {
+  const tid = Number(req.params.id);
+
+  const criteria = db.prepare('SELECT * FROM criteria WHERE tournament_id = ? ORDER BY sort_order').all(tid);
+
+  const scores = db.prepare(`
+    SELECT cs.participant_id, cs.criterion_id, AVG(cs.score) as avg_score
+    FROM choreography_scores cs
+    WHERE cs.tournament_id = ?
+    GROUP BY cs.participant_id, cs.criterion_id
+  `).all(tid);
+
+  if (!scores.length) return res.json({ criteria, participants: [] });
+
+  const participantIds = [...new Set(scores.map(s => s.participant_id))];
+  const placeholders = participantIds.map(() => '?').join(',');
+  const participants = db.prepare(`
+    SELECT id, name, category, act_order, round_number
+    FROM participants WHERE id IN (${placeholders})
+    ORDER BY COALESCE(act_order, 9999), id
+  `).all(...participantIds);
+
+  const scoreMap = {};
+  for (const s of scores) {
+    if (!scoreMap[s.participant_id]) scoreMap[s.participant_id] = {};
+    scoreMap[s.participant_id][s.criterion_id] = s.avg_score;
+  }
+
+  const result = participants.map(p => ({ ...p, criterionScores: scoreMap[p.id] || {} }));
+  res.json({ criteria, participants: result });
 });
 
 module.exports = router;

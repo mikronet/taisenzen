@@ -55,7 +55,8 @@ function categoryColor(cat) {
 export default function CoreoScreen() {
   const { id } = useParams();
   const socket = useSocket();
-  const [onStage, setOnStage] = useState(null); // participant data or null
+  const [onStage, setOnStage] = useState(null);
+  const [tournamentInfo, setTournamentInfo] = useState({ name: '', poster_path: null });
 
   useEffect(() => {
     if (!socket || !id) return;
@@ -64,11 +65,15 @@ export default function CoreoScreen() {
     join();
     socket.on('connect', join);
 
+    socket.on('coreo:tournament-info', ({ name, poster_path }) => setTournamentInfo({ name, poster_path }));
+    socket.on('coreo:poster-updated', ({ poster_path }) => setTournamentInfo(prev => ({ ...prev, poster_path })));
     socket.on('coreo:on-stage', ({ participant }) => setOnStage(participant));
     socket.on('coreo:off-stage', () => setOnStage(null));
 
     return () => {
       socket.off('connect', join);
+      socket.off('coreo:tournament-info');
+      socket.off('coreo:poster-updated');
       socket.off('coreo:on-stage');
       socket.off('coreo:off-stage');
     };
@@ -76,7 +81,38 @@ export default function CoreoScreen() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a12', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+
+      {/* Poster background */}
+      {tournamentInfo.poster_path && (
+        <img
+          src={`/uploads/${tournamentInfo.poster_path}`}
+          alt=""
+          style={{
+            position: 'fixed', inset: 0, width: '100%', height: '100%',
+            objectFit: 'cover', opacity: 0.08, pointerEvents: 'none', zIndex: 0,
+          }}
+        />
+      )}
+
       <ParticleCanvas />
+
+      {/* Tournament name — top left */}
+      {tournamentInfo.name && (
+        <div style={{
+          position: 'fixed', top: '24px', left: '32px', zIndex: 2,
+          display: 'flex', flexDirection: 'column', gap: '2px',
+        }}>
+          <span style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: 'clamp(0.9rem, 2vw, 1.3rem)',
+            letterSpacing: '0.2em',
+            color: 'rgba(126,207,255,0.7)',
+            lineHeight: 1,
+          }}>
+            {tournamentInfo.name}
+          </span>
+        </div>
+      )}
 
       {!onStage ? (
         // Idle screen
@@ -145,25 +181,8 @@ export default function CoreoScreen() {
               )}
             </div>
           )}
-
-          {/* Badge EN ESCENA pulsante — al final para no distraer del contenido */}
-          <div style={{
-            background: 'rgba(126,207,255,0.1)', border: '1px solid rgba(126,207,255,0.4)',
-            borderRadius: '40px', padding: '7px 24px', display: 'flex', alignItems: 'center', gap: '10px',
-            animation: 'pulse 2s ease-in-out infinite', marginTop: '8px',
-          }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', display: 'inline-block', boxShadow: '0 0 8px #7ecfff' }} />
-            <span style={{ color: '#7ecfff', fontSize: 'clamp(0.65rem, 1.3vw, 0.8rem)', letterSpacing: '0.35em', fontWeight: 700 }}>EN ESCENA</span>
-          </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
-        }
-      `}</style>
     </div>
   );
 }

@@ -12,8 +12,10 @@ function setupSocket(io) {
         // Restore current screen state for this client (handles reconnects)
         const tournament = db.prepare('SELECT tournament_type, screen_state, waiting_screen, timer_status, timer_start_at, timer_remaining_s, timer_duration_s, global_timer_status, global_timer_start_at, global_timer_remaining_s, global_timer_duration_s FROM tournaments WHERE id = ?').get(tid);
 
-        // Coreo: restore on-stage participant for reconnection
+        // Coreo: send tournament info + restore on-stage participant for reconnection
         if (tournament?.tournament_type === 'coreografia') {
+          const t = db.prepare('SELECT name, poster_path FROM tournaments WHERE id = ?').get(tid);
+          socket.emit('coreo:tournament-info', { name: t?.name || '', poster_path: t?.poster_path || null });
           const onStage = db.prepare(`
             SELECT p.id, p.name, p.category, p.photo_path, p.act_order
             FROM participants p
