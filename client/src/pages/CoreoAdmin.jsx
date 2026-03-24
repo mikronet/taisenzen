@@ -1144,7 +1144,147 @@ function SpeakerMsgPanel({ tournamentId }) {
 }
 
 // ── LIVE tab ──────────────────────────────────────────────────────────────────
-function LiveTab({ tournamentId, participants, onUpdate }) {
+// ── Timing helpers ────────────────────────────────────────────────────────────
+function fmtElapsed(startedAt, now = Date.now()) {
+  if (!startedAt) return '00:00:00';
+  const total = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+}
+
+function fmtDuration(seconds) {
+  if (seconds == null || seconds < 0) return '—';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  if (m >= 60) return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}min`;
+  if (m === 0) return `${s}s`;
+  return `${m}min ${s > 0 ? s + 's' : ''}`.trim();
+}
+
+function computeTiming(participants, now = Date.now()) {
+  const allPerformed = participants.filter(p => p.on_stage_duration_s > 0);
+  const globalAvg = allPerformed.length
+    ? allPerformed.reduce((s, p) => s + p.on_stage_duration_s, 0) / allPerformed.length
+    : null;
+
+  // Group by round → category
+  const groups = {}; // { round: { cat: { performed[], inProgress, pending[] } } }
+  for (const p of participants) {
+    const r = p.round_number || 1;
+    const cat = p.category || '—';
+    if (!groups[r]) groups[r] = {};
+    if (!groups[r][cat]) groups[r][cat] = { performed: [], inProgress: null, pending: [] };
+    if (p.on_stage) groups[r][cat].inProgress = p;
+    else if (p.on_stage_duration_s > 0) groups[r][cat].performed.push(p);
+    else groups[r][cat].pending.push(p);
+  }
+
+  const calcGroup = (g) => {
+    const catDurations = g.performed.map(p => p.on_stage_duration_s);
+    const avg = catDurations.length
+      ? catDurations.reduce((a, b) => a + b, 0) / catDurations.length
+      : globalAvg;
+    let remaining = null;
+    if (avg != null) {
+      let inProg = 0;
+      if (g.inProgress?.on_stage_at) inProg = Math.max(0, avg - (now - g.inProgress.on_stage_at) / 1000);
+      else if (g.inProgress) inProg = avg;
+      remaining = inProg + g.pending.length * avg;
+    }
+    const done = g.performed.length;
+    const total = done + (g.inProgress ? 1 : 0) + g.pending.length;
+    return { done, total, avg, remaining };
+  };
+
+  const blocks = {};
+  const blockTotals = {};
+  for (const [round, cats] of Object.entries(groups)) {
+    blocks[round] = {};
+    let bDone = 0, bTotal = 0, bRemaining = 0, bHasEst = false;
+    for (const [cat, g] of Object.entries(cats)) {
+      const s = calcGroup(g);
+      blocks[round][cat] = s;
+      bDone += s.done; bTotal += s.total;
+      if (s.remaining != null) { bRemaining += s.remaining; bHasEst = true; }
+    }
+    blockTotals[round] = { done: bDone, total: bTotal, remaining: bHasEst ? bRemaining : null };
+  }
+  return { blocks, blockTotals, globalAvg };
+}
+
+// ── TimingWidget ──────────────────────────────────────────────────────────────
+function TimingWidget({ timing, tournamentStatus }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (tournamentStatus !== 'active') return;
+    const iv = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, [tournamentStatus]);
+
+  if (!timing?.started_at) return null;
+
+  const { blocks, blockTotals, globalAvg } = computeTiming(timing.participants, now);
+  const roundOrder = Object.keys(blocks).map(Number).sort((a, b) => a - b);
+
+  return (
+    <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px' }}>
+      {/* Cronómetro total */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem', letterSpacing: '0.15em' }}>⏱ TORNEO</span>
+          <span style={{ color: '#7ecfff', fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+            {fmtElapsed(timing.started_at, tournamentStatus === 'active' ? now : timing.started_at + (timing.finished_duration_s ?? 0) * 1000)}
+          </span>
+        </div>
+        {globalAvg != null && (
+          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem' }}>
+            media/actuación: <span style={{ color: 'rgba(255,255,255,0.5)' }}>{fmtDuration(globalAvg)}</span>
+          </span>
+        )}
+      </div>
+
+      {/* Por bloque */}
+      {roundOrder.map(round => {
+        const bt = blockTotals[round];
+        const cats = blocks[round];
+        const catEntries = Object.entries(cats);
+        return (
+          <div key={round} style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
+              <span style={{ color: '#7ecfff', fontSize: '0.68rem', letterSpacing: '0.15em', fontWeight: 700 }}>BLOQUE {round}</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>{bt.done}/{bt.total} actuados</span>
+              {bt.remaining != null && bt.remaining > 1 && (
+                <span style={{ color: '#fb923c', fontSize: '0.72rem' }}>est. restante: {fmtDuration(bt.remaining)}</span>
+              )}
+              {bt.remaining != null && bt.remaining <= 1 && bt.total > 0 && (
+                <span style={{ color: '#34d399', fontSize: '0.72rem' }}>✓ completado</span>
+              )}
+            </div>
+            {/* Por categoría */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingLeft: '8px' }}>
+              {catEntries.map(([cat, s]) => (
+                <div key={cat} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '4px 9px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: categoryColor(cat), fontWeight: 700 }}>{cat}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.35)' }}>{s.done}/{s.total}</span>
+                  {s.remaining != null && s.remaining > 1 && (
+                    <span style={{ color: '#fb923c' }}>~{fmtDuration(s.remaining)}</span>
+                  )}
+                  {s.remaining != null && s.remaining <= 1 && s.total > 0 && (
+                    <span style={{ color: '#34d399' }}>✓</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus }) {
   const [onStageId, setOnStageId] = useState(() => participants.find(p => p.on_stage)?.id ?? null);
   const [loading, setLoading] = useState(null);
 
@@ -1181,6 +1321,7 @@ function LiveTab({ tournamentId, participants, onUpdate }) {
 
   return (
     <div>
+        <TimingWidget timing={timing} tournamentStatus={tournamentStatus} />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: 0 }}>CONTROL DE ESCENA</h3>
           {onStageId && (
@@ -1441,6 +1582,7 @@ export default function CoreoAdmin() {
   const [judges, setJudges] = useState([]);
   const [organizers, setOrganizers] = useState([]);
   const [speakers, setSpeakers] = useState([]);
+  const [timing, setTiming] = useState(null);
   const [tab, setTab] = useState('config');
   const [toast, setToast] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -1468,10 +1610,16 @@ export default function CoreoAdmin() {
     setNeedsOrgLogin(false);
   }, [id, navigate, isAdmin, hasOrgCode]);
 
+  const loadTiming = useCallback(async () => {
+    const r = await apiFetch(`${API}/tournaments/${id}/timing`);
+    if (r.ok) setTiming(await r.json());
+  }, [id]);
+
   useEffect(() => {
     if (!isAdmin && !hasOrgCode) { setNeedsOrgLogin(true); return; }
     load();
-  }, [load, isAdmin, hasOrgCode]);
+    loadTiming();
+  }, [load, loadTiming, isAdmin, hasOrgCode]);
 
   useEffect(() => {
     if (!socket || !id) return;
@@ -1479,7 +1627,7 @@ export default function CoreoAdmin() {
     const join = () => {
       socket.emit('join:admin', Number(id));
       // On reconnection (not the first connect) reload all data to catch missed events
-      if (!initialConnect) load();
+      if (!initialConnect) { load(); loadTiming(); }
       initialConnect = false;
     };
     join();
@@ -1501,15 +1649,17 @@ export default function CoreoAdmin() {
     socket.on('coreo:on-stage', ({ participant }) => setParticipants(prev => prev.map(p => ({ ...p, on_stage: p.id === participant.id ? 1 : 0 }))));
     socket.on('coreo:off-stage', () => setParticipants(prev => prev.map(p => ({ ...p, on_stage: 0 }))));
     socket.on('coreo:poster-updated', ({ poster_path }) => setTournament(prev => prev ? { ...prev, poster_path } : prev));
+    socket.on('coreo:timing-updated', setTiming);
     return () => {
       socket.off('connect', join);
       ['coreo:criteria-updated', 'coreo:config-updated', 'coreo:participant-added',
         'coreo:participant-updated', 'coreo:participant-removed', 'coreo:order-updated',
         'coreo:judge-added', 'coreo:judge-removed', 'coreo:organizer-added',
         'coreo:organizer-removed', 'coreo:speaker-added', 'coreo:speaker-removed',
-        'coreo:on-stage', 'coreo:off-stage', 'coreo:poster-updated'].forEach(e => socket.off(e));
+        'coreo:on-stage', 'coreo:off-stage', 'coreo:poster-updated',
+        'coreo:timing-updated'].forEach(e => socket.off(e));
     };
-  }, [socket, id, load]);
+  }, [socket, id, load, loadTiming]);
 
   if (needsOrgLogin) {
     return <OrganizerLogin onLogin={(org) => {
@@ -1667,6 +1817,8 @@ export default function CoreoAdmin() {
             tournamentId={Number(id)}
             participants={participants}
             onUpdate={setParticipants}
+            timing={timing}
+            tournamentStatus={tournament.status}
           />
         )}
       </div>

@@ -103,6 +103,34 @@ function RankingBlock({ ranking }) {
   );
 }
 
+// ── Timing helpers (speaker) ──────────────────────────────────────────────────
+function fmtDuration(seconds) {
+  if (seconds == null || seconds < 0) return '—';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  if (m >= 60) return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}min`;
+  if (m === 0) return `${s}s`;
+  return `${m}min${s > 0 ? ' ' + s + 's' : ''}`;
+}
+
+function computeCategory(timingParticipants, category, round, now = Date.now()) {
+  const pts = timingParticipants.filter(p => (p.round_number || 1) === round && (p.category || '—') === category);
+  if (!pts.length) return null;
+  const performed = pts.filter(p => p.on_stage_duration_s > 0 && !p.on_stage);
+  const inProgress = pts.find(p => p.on_stage) ?? null;
+  const pending = pts.filter(p => !p.on_stage && !(p.on_stage_duration_s > 0));
+  const catAvg = performed.length
+    ? performed.reduce((s, p) => s + p.on_stage_duration_s, 0) / performed.length
+    : null;
+  const avg = catAvg;
+  if (avg == null) return { done: performed.length, total: pts.length, avg: null, remaining: null };
+  let inProgRem = 0;
+  if (inProgress?.on_stage_at) inProgRem = Math.max(0, avg - (now - inProgress.on_stage_at) / 1000);
+  else if (inProgress) inProgRem = avg;
+  const remaining = inProgRem + pending.length * avg;
+  return { done: performed.length, total: pts.length, avg, remaining };
+}
+
 // ── Main panel ─────────────────────────────────────────────────────────────────
 function SpeakerPanel({ tournament, participants: initialParticipants }) {
   const socket = useSocket();
@@ -111,8 +139,15 @@ function SpeakerPanel({ tournament, participants: initialParticipants }) {
   const [thread, setThread] = useState([]); // { dir:'in'|'out', text, type, ranking, from, sentAt }
   const [msgText, setMsgText] = useState('');
   const [sending, setSending] = useState(false);
+  const [timing, setTiming] = useState({ started_at: tournament.started_at, participants: initialParticipants });
+  const [nowTick, setNowTick] = useState(Date.now());
   const chatBottomRef = useRef(null);
   const tournamentId = tournament.id;
+
+  useEffect(() => {
+    const iv = setInterval(() => setNowTick(Date.now()), 15000); // refresh estimate every 15s
+    return () => clearInterval(iv);
+  }, []);
 
   const addIncoming = useCallback((msg) => {
     setThread(prev => [...prev, { dir: 'in', ...msg }]);
@@ -136,11 +171,13 @@ function SpeakerPanel({ tournament, participants: initialParticipants }) {
       setParticipants(prev => prev.map(p => ({ ...p, on_stage: 0 })));
     });
     socket.on('coreo:speaker-update', addIncoming);
+    socket.on('coreo:timing-updated', setTiming);
     return () => {
       socket.off('connect', join);
       socket.off('coreo:on-stage');
       socket.off('coreo:off-stage');
       socket.off('coreo:speaker-update', addIncoming);
+      socket.off('coreo:timing-updated', setTiming);
     };
   }, [socket, tournamentId, addIncoming]);
 
@@ -177,6 +214,12 @@ function SpeakerPanel({ tournament, participants: initialParticipants }) {
   const allSorted = rounds.flatMap(r => r.participants);
   const onStageIdx = onStage ? allSorted.findIndex(p => p.id === onStage.id) : -1;
   const nextUp = onStageIdx >= 0 ? allSorted[onStageIdx + 1] ?? null : null;
+
+  // Category timing estimate (current or next category)
+  const refParticipant = onStage ?? allSorted.find(p => !p.on_stage_duration_s && !p.on_stage) ?? null;
+  const catStats = refParticipant
+    ? computeCategory(timing.participants, refParticipant.category || '—', refParticipant.round_number || 1, nowTick)
+    : null;
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a12', color: '#fff', fontFamily: "'Inter', sans-serif", display: 'flex', flexDirection: 'column' }}>
@@ -230,6 +273,28 @@ function SpeakerPanel({ tournament, participants: initialParticipants }) {
             </div>
           )}
         </div>
+
+        {/* Category timing estimate */}
+        {catStats && refParticipant && (
+          <div style={{ background: 'rgba(251,146,60,0.04)', border: '1px solid rgba(251,146,60,0.15)', borderRadius: '10px', padding: '12px 16px' }}>
+            <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', letterSpacing: '0.18em', marginBottom: '6px' }}>
+              EST. RESTANTE · {(refParticipant.category || '—').toUpperCase()}
+              {catStats.avg != null && (
+                <span style={{ marginLeft: '8px', color: 'rgba(255,255,255,0.2)' }}>
+                  · media {fmtDuration(catStats.avg)}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+              <span style={{ color: catStats.remaining != null ? '#fb923c' : 'rgba(255,255,255,0.2)', fontSize: '1.6rem', fontWeight: 700, lineHeight: 1 }}>
+                {catStats.remaining != null ? fmtDuration(catStats.remaining) : '—'}
+              </span>
+              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>
+                {catStats.done}/{catStats.total} actuados
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Participant order list */}
         <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid #1a1a2e', borderRadius: '12px', overflow: 'hidden' }}>

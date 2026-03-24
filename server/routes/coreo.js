@@ -40,14 +40,16 @@ router.post('/speaker-login', (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Código requerido' });
   const speaker = db.prepare(`
-    SELECT s.id, s.name, s.tournament_id, s.access_code, t.name as tournament_name
+    SELECT s.id, s.name, s.tournament_id, s.access_code,
+           t.name as tournament_name, t.status, t.started_at
     FROM coreo_speakers s JOIN tournaments t ON t.id = s.tournament_id
     WHERE s.access_code = ? AND t.tournament_type = 'coreografia'
   `).get(code.trim());
   if (!speaker) return res.status(401).json({ error: 'Código no válido' });
-  const tournament = { id: speaker.tournament_id, name: speaker.tournament_name };
+  const tournament = { id: speaker.tournament_id, name: speaker.tournament_name, status: speaker.status, started_at: speaker.started_at };
   const participants = db.prepare(`
-    SELECT id, name, category, age_group, photo_path, act_order, on_stage, round_number
+    SELECT id, name, category, age_group, photo_path, act_order, on_stage, round_number,
+           on_stage_at, on_stage_duration_s
     FROM participants WHERE tournament_id = ?
     ORDER BY COALESCE(round_number, 1), COALESCE(act_order, 9999), id
   `).all(tournament.id);
@@ -282,6 +284,17 @@ router.put('/tournaments/:id/act-order', (req, res) => {
   res.json({ success: true });
 });
 
+// ── Timing helper ─────────────────────────────────────────────────────────────
+function emitTiming(io, tid) {
+  const t = db.prepare('SELECT started_at, status FROM tournaments WHERE id = ?').get(tid);
+  const pts = db.prepare(
+    'SELECT id, category, round_number, act_order, on_stage, on_stage_at, on_stage_duration_s FROM participants WHERE tournament_id = ? ORDER BY COALESCE(act_order, 9999), id'
+  ).all(tid);
+  const payload = { started_at: t?.started_at, status: t?.status, participants: pts };
+  io.to(`admin:${tid}`).emit('coreo:timing-updated', payload);
+  io.to(`coreo-speaker:${tid}`).emit('coreo:timing-updated', payload);
+}
+
 // ── POST /api/coreo/participants/:id/on-stage ────────────────────────────────
 router.post('/participants/:id/on-stage', (req, res) => {
   const pid = Number(req.params.id);
@@ -289,12 +302,19 @@ router.post('/participants/:id/on-stage', (req, res) => {
   if (!participant) return res.status(404).json({ error: 'Participante no encontrado' });
 
   const tid = participant.tournament_id;
+  const now = Date.now();
 
   const txn = db.transaction(() => {
+    // Save duration of whoever was previously on stage
+    const prev = db.prepare('SELECT id, on_stage_at FROM participants WHERE tournament_id = ? AND on_stage = 1').get(tid);
+    if (prev?.on_stage_at) {
+      const dur = (now - prev.on_stage_at) / 1000;
+      db.prepare('UPDATE participants SET on_stage_duration_s = on_stage_duration_s + ?, on_stage_at = NULL WHERE id = ?').run(dur, prev.id);
+    }
     db.prepare('UPDATE participants SET on_stage = 0 WHERE tournament_id = ?').run(tid);
-    db.prepare('UPDATE participants SET on_stage = 1 WHERE id = ?').run(pid);
-    // First time a participant goes on-stage: transition tournament from setup → active
-    db.prepare("UPDATE tournaments SET status = 'active' WHERE id = ? AND status = 'setup'").run(tid);
+    db.prepare('UPDATE participants SET on_stage = 1, on_stage_at = ? WHERE id = ?').run(now, pid);
+    // First on-stage: activate tournament and record start time
+    db.prepare("UPDATE tournaments SET status = 'active', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'setup'").run(now, tid);
   });
   txn();
 
@@ -309,17 +329,26 @@ router.post('/participants/:id/on-stage', (req, res) => {
   req.io.to(`screen:${tid}`).emit('coreo:on-stage', payload);
   req.io.to(`admin:${tid}`).emit('coreo:on-stage', payload);
   req.io.to(`judge:${tid}`).emit('coreo:on-stage', payload);
+  emitTiming(req.io, tid);
   res.json({ success: true, participant: onStageData });
 });
 
 // ── POST /api/coreo/tournaments/:id/off-stage ────────────────────────────────
 router.post('/tournaments/:id/off-stage', (req, res) => {
   const tid = Number(req.params.id);
+  const now = Date.now();
+  // Save duration of whoever was on stage
+  const prev = db.prepare('SELECT id, on_stage_at FROM participants WHERE tournament_id = ? AND on_stage = 1').get(tid);
+  if (prev?.on_stage_at) {
+    const dur = (now - prev.on_stage_at) / 1000;
+    db.prepare('UPDATE participants SET on_stage_duration_s = on_stage_duration_s + ?, on_stage_at = NULL WHERE id = ?').run(dur, prev.id);
+  }
   db.prepare('UPDATE participants SET on_stage = 0 WHERE tournament_id = ?').run(tid);
   db.prepare('UPDATE tournaments SET screen_state = ? WHERE id = ?').run(JSON.stringify({ mode: 'idle' }), tid);
   req.io.to(`screen:${tid}`).emit('coreo:off-stage');
   req.io.to(`admin:${tid}`).emit('coreo:off-stage');
   req.io.to(`judge:${tid}`).emit('coreo:off-stage');
+  emitTiming(req.io, tid);
   res.json({ success: true });
 });
 
@@ -463,6 +492,16 @@ router.get('/tournaments/:id/scores/summary', (req, res) => {
   });
 
   res.json({ criteria, judges, participants: result });
+});
+
+// ── GET /api/coreo/tournaments/:id/timing ────────────────────────────────────
+router.get('/tournaments/:id/timing', requireAdmin, (req, res) => {
+  const tid = Number(req.params.id);
+  const t = db.prepare('SELECT started_at, status FROM tournaments WHERE id = ?').get(tid);
+  const participants = db.prepare(
+    'SELECT id, name, category, round_number, act_order, on_stage, on_stage_at, on_stage_duration_s FROM participants WHERE tournament_id = ? ORDER BY COALESCE(act_order, 9999), id'
+  ).all(tid);
+  res.json({ started_at: t?.started_at, status: t?.status, participants });
 });
 
 // Send message/ranking to speaker
