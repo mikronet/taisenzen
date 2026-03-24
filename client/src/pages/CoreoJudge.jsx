@@ -14,7 +14,7 @@ function categoryColor(cat) {
 }
 
 function apiFetch(url, options = {}) {
-  const code = sessionStorage.getItem('coreoJudgeCode') || '';
+  const code = localStorage.getItem('coreoJudgeCode') || '';
   return fetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', 'x-judge-code': code, ...(options.headers || {}) },
@@ -38,9 +38,9 @@ function JudgeLogin({ onLogin }) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Error'); return; }
-      sessionStorage.setItem('coreoJudgeCode', code.trim());
-      sessionStorage.setItem('coreoJudgeId', data.judge.id);
-      sessionStorage.setItem('coreoJudgeTournamentId', data.judge.tournament_id);
+      localStorage.setItem('coreoJudgeCode', code.trim());
+      localStorage.setItem('coreoJudgeId', data.judge.id);
+      localStorage.setItem('coreoJudgeTournamentId', data.judge.tournament_id);
       onLogin(data.judge);
     } finally { setLoading(false); }
   };
@@ -506,21 +506,21 @@ function JudgePanel({ judge, onLogout }) {
 // ── Root component ────────────────────────────────────────────────────────────
 export default function CoreoJudge() {
   const [judge, setJudge] = useState(() => {
-    const id = sessionStorage.getItem('coreoJudgeId');
-    const tid = sessionStorage.getItem('coreoJudgeTournamentId');
-    const code = sessionStorage.getItem('coreoJudgeCode');
-    const name = sessionStorage.getItem('coreoJudgeName');
+    const id = localStorage.getItem('coreoJudgeId');
+    const tid = localStorage.getItem('coreoJudgeTournamentId');
+    const code = localStorage.getItem('coreoJudgeCode');
+    const name = localStorage.getItem('coreoJudgeName');
     if (id && tid && code) return { id: Number(id), tournament_id: Number(tid), name: name || 'Juez' };
     return null;
   });
 
   const handleLogin = (j) => {
-    sessionStorage.setItem('coreoJudgeName', j.name);
+    localStorage.setItem('coreoJudgeName', j.name);
     setJudge(j);
   };
 
   const handleLogout = () => {
-    ['coreoJudgeCode', 'coreoJudgeId', 'coreoJudgeTournamentId', 'coreoJudgeName'].forEach(k => sessionStorage.removeItem(k));
+    ['coreoJudgeCode', 'coreoJudgeId', 'coreoJudgeTournamentId', 'coreoJudgeName'].forEach(k => localStorage.removeItem(k));
     setJudge(null);
   };
 

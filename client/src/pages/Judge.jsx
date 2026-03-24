@@ -28,9 +28,9 @@ export default function Judge() {
   // Restore session on mount (judge closed tab and came back)
   // Also auto-login if ?code= is present in the URL
   useEffect(() => {
-    const saved = sessionStorage.getItem('judgeSession');
+    const saved = localStorage.getItem('judgeSession');
     if (saved) {
-      try { setJudge(JSON.parse(saved)); return; } catch (e) { sessionStorage.removeItem('judgeSession'); }
+      try { setJudge(JSON.parse(saved)); return; } catch (e) { localStorage.removeItem('judgeSession'); }
     }
     const urlCode = new URLSearchParams(window.location.search).get('code');
     if (urlCode) {
@@ -39,7 +39,7 @@ export default function Judge() {
         body: JSON.stringify({ code: urlCode })
       }).then(r => r.ok ? r.json() : null).then(data => {
         if (data) {
-          sessionStorage.setItem('judgeSession', JSON.stringify(data));
+          localStorage.setItem('judgeSession', JSON.stringify(data));
           setJudge(data);
         } else {
           setError('Código inválido');
@@ -56,7 +56,7 @@ export default function Judge() {
     });
     if (res.ok) {
       const data = await res.json();
-      sessionStorage.setItem('judgeSession', JSON.stringify(data));
+      localStorage.setItem('judgeSession', JSON.stringify(data));
       setJudge(data);
       setError('');
     } else {
@@ -93,7 +93,7 @@ export default function Judge() {
                 if (team) { initial[`${p.id}_m1`] = 2.5; initial[`${p.id}_m2`] = 2.5; }
                 else { initial[p.id] = 5.0; }
               });
-              const saved = sessionStorage.getItem(`filtrosScores_${data.match.id}`);
+              const saved = localStorage.getItem(`filtrosScores_${data.match.id}`);
               if (saved) { try { setScores(JSON.parse(saved)); setTouchedScores(Object.fromEntries(Object.keys(initial).map(k => [k, true]))); } catch { setScores(initial); setTouchedScores({}); } }
               else { setScores(initial); setTouchedScores({}); }
             }
@@ -143,7 +143,7 @@ export default function Judge() {
     });
 
     socket.on('round:closed', () => {
-      setMatch(prev => { if (prev?.id) sessionStorage.removeItem(`filtrosScores_${prev.id}`); return null; });
+      setMatch(prev => { if (prev?.id) localStorage.removeItem(`filtrosScores_${prev.id}`); return null; });
       setVoted(false);
       setWaiting(false);
       setResult(null);
@@ -157,7 +157,7 @@ export default function Judge() {
       // Clear saved filtros scores for the current match so judge starts fresh
       setMatch(prev => {
         if (prev?.id && prev.phase_type === 'filtros') {
-          sessionStorage.removeItem(`filtrosScores_${prev.id}`);
+          localStorage.removeItem(`filtrosScores_${prev.id}`);
         }
         return prev;
       });
@@ -185,10 +185,10 @@ export default function Judge() {
     };
   }, [judge, socket]);
 
-  // Persist filtros scores to sessionStorage whenever they change
+  // Persist filtros scores to localStorage whenever they change
   useEffect(() => {
     if (match?.phase_type === 'filtros' && match?.id && Object.keys(scores).length > 0) {
-      sessionStorage.setItem(`filtrosScores_${match.id}`, JSON.stringify(scores));
+      localStorage.setItem(`filtrosScores_${match.id}`, JSON.stringify(scores));
     }
   }, [scores, match?.id, match?.phase_type]);
 
@@ -258,7 +258,7 @@ export default function Judge() {
       if (res.ok) {
         pendingActionRef.current = null;
         setShowConfirm(false);
-        sessionStorage.removeItem(`filtrosScores_${match.id}`);
+        localStorage.removeItem(`filtrosScores_${match.id}`);
         setVoted(true);
         setWaiting(true);
       } else {
