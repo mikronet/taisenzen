@@ -180,6 +180,10 @@ function ScoreForm({ participant, criteria, judgeId, onSaved, onLoaded }) {
   );
 }
 
+function fmtTimer(s) {
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
 // ── Main judge panel ──────────────────────────────────────────────────────────
 function JudgePanel({ judge, onLogout }) {
   const socket = useSocket();
@@ -188,11 +192,18 @@ function JudgePanel({ judge, onLogout }) {
   const [savedIds, setSavedIds] = useState(new Set());
   const [participantScores, setParticipantScores] = useState({}); // { pid: { criterionId: score } }
   const [onStageId, setOnStageId] = useState(null);
+  const [onStageAt, setOnStageAt] = useState(null); // ms timestamp when timer started
+  const [nowMs, setNowMs] = useState(Date.now());
   const [glowing, setGlowing] = useState(false); // triggers glow burst on new on-stage event
   const [globalScores, setGlobalScores] = useState({}); // { pid: { globalAvg, judgesVoted } }
   const [totalJudges, setTotalJudges] = useState(0);
   const itemRefs = useRef({}); // participantId → DOM button ref
   const sidebarRef = useRef(null);
+
+  useEffect(() => {
+    const iv = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, []);
 
   const scrollToParticipant = useCallback((pid) => {
     const el = itemRefs.current[pid];
@@ -217,9 +228,10 @@ function JudgePanel({ judge, onLogout }) {
     const onStage = data.participants.find(p => p.on_stage);
     if (onStage) {
       setOnStageId(onStage.id);
+      setOnStageAt(onStage.on_stage_at || null);
       setSelectedId(prev => prev ?? onStage.id);
-    } else if (data.participants.length > 0) {
-      setSelectedId(prev => prev ?? data.participants[0].id);
+    } else {
+      setOnStageAt(null);
     }
   }, [judge.tournament_id]);
 
@@ -248,14 +260,13 @@ function JudgePanel({ judge, onLogout }) {
     join();
     socket.on('connect', join);
     socket.on('coreo:on-stage', ({ participant }) => {
-      // Update on_stage flag in participant list
       setState(prev => prev ? {
         ...prev,
         participants: prev.participants.map(p => ({ ...p, on_stage: p.id === participant.id ? 1 : 0 })),
       } : prev);
       setOnStageId(participant.id);
-      setSelectedId(participant.id); // auto-navigate to on-stage participant
-      // Trigger glow burst animation
+      setOnStageAt(null); // timer not started yet
+      setSelectedId(participant.id);
       setGlowing(false);
       setTimeout(() => setGlowing(true), 10);
     });
@@ -265,11 +276,20 @@ function JudgePanel({ judge, onLogout }) {
         participants: prev.participants.map(p => ({ ...p, on_stage: 0 })),
       } : prev);
       setOnStageId(null);
+      setOnStageAt(null);
+    });
+    socket.on('coreo:timer-started', ({ on_stage_at }) => {
+      setOnStageAt(on_stage_at);
+    });
+    socket.on('coreo:timer-stopped', () => {
+      setOnStageAt(null);
     });
     return () => {
       socket.off('connect', join);
       socket.off('coreo:on-stage');
       socket.off('coreo:off-stage');
+      socket.off('coreo:timer-started');
+      socket.off('coreo:timer-stopped');
     };
   }, [socket, judge]);
 
@@ -412,7 +432,10 @@ function JudgePanel({ judge, onLogout }) {
         {/* Main area */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
           {!selected ? (
-            <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: '60px' }}>Selecciona un participante</p>
+            <div style={{ textAlign: 'center', marginTop: '80px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', display: 'inline-block', marginBottom: '20px' }} />
+              <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', letterSpacing: '0.15em' }}>Esperando al primer participante en escena...</p>
+            </div>
           ) : (
             <div style={{ maxWidth: '560px', margin: '0 auto' }}>
               {/* Participant card */}
@@ -426,9 +449,14 @@ function JudgePanel({ judge, onLogout }) {
                 )}
                 <div style={{ flex: 1 }}>
                   {selected.id === onStageId && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', display: 'inline-block', boxShadow: '0 0 8px #7ecfff' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', display: 'inline-block', boxShadow: '0 0 8px #7ecfff', animation: 'dotPulse 1.5s ease-in-out infinite' }} />
                       <span style={{ color: '#7ecfff', fontSize: '0.7rem', letterSpacing: '0.2em', fontWeight: 700 }}>EN ESCENA</span>
+                      {onStageAt && (
+                        <span style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: 700, color: '#7ecfff', letterSpacing: '0.05em' }}>
+                          {fmtTimer(Math.max(0, Math.floor((nowMs - onStageAt) / 1000)))}
+                        </span>
+                      )}
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
@@ -506,9 +534,15 @@ function JudgePanel({ judge, onLogout }) {
 // ── Root component ────────────────────────────────────────────────────────────
 export default function CoreoJudge() {
   const [judge, setJudge] = useState(() => {
+    // If the URL carries a ?code= that differs from the stored one, don't restore the old session
+    // (multiple judges can open their own link in the same browser without interfering)
+    const urlCode = new URLSearchParams(window.location.search).get('code');
+    const storedCode = localStorage.getItem('coreoJudgeCode');
+    if (urlCode && urlCode !== storedCode) return null;
+
     const id = localStorage.getItem('coreoJudgeId');
     const tid = localStorage.getItem('coreoJudgeTournamentId');
-    const code = localStorage.getItem('coreoJudgeCode');
+    const code = storedCode;
     const name = localStorage.getItem('coreoJudgeName');
     if (id && tid && code) return { id: Number(id), tournament_id: Number(tid), name: name || 'Juez' };
     return null;

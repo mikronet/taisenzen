@@ -21,7 +21,8 @@ export default function CoreoOrganizer() {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Código no válido'); return; }
-      sessionStorage.setItem('coreoOrgCode', code.trim());
+      localStorage.setItem('coreoOrgCode', code.trim());
+      localStorage.setItem('coreoOrgName', data.organizer.name);
       navigate(`/coreo-admin/${data.organizer.tournament_id}`);
     } finally { setLoading(false); }
   };

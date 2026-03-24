@@ -32,7 +32,7 @@ router.get('/tournament/:id/state', requireJudge, (req, res) => {
   const criteria = db.prepare('SELECT * FROM criteria WHERE tournament_id = ? ORDER BY sort_order').all(tid);
 
   const participants = db.prepare(`
-    SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number
+    SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number, on_stage_at, on_stage_duration_s
     FROM participants WHERE tournament_id = ? ORDER BY COALESCE(act_order, 9999), id
   `).all(tid);
 
@@ -67,7 +67,7 @@ router.post('/scores', requireJudge, (req, res) => {
   });
   txn();
 
-  req.io.to(`admin:${tid}`).emit('coreo:scores-updated');
+  req.io.to(`admin:${tid}`).to(`judge:${tid}`).emit('coreo:scores-updated');
   res.json({ success: true });
 });
 

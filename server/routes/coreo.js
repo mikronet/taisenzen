@@ -53,7 +53,7 @@ router.post('/speaker-login', (req, res) => {
     FROM participants WHERE tournament_id = ?
     ORDER BY COALESCE(round_number, 1), COALESCE(act_order, 9999), id
   `).all(tournament.id);
-  res.json({ tournament, participants });
+  res.json({ speaker: { id: speaker.id, name: speaker.name }, tournament, participants });
 });
 
 router.post('/organizer-login', (req, res) => {
@@ -78,6 +78,7 @@ router.post('/speaker/message', (req, res) => {
   if (!text?.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
   req.io.to(`admin:${speaker.tournament_id}`).emit('coreo:staff-msg', {
     from: speaker.name,
+    type: 'message',
     text: text.trim(),
     sentAt: Date.now(),
   });
@@ -95,7 +96,8 @@ router.get('/tournaments/:id', (req, res) => {
   const criteria = db.prepare('SELECT * FROM criteria WHERE tournament_id = ? ORDER BY sort_order').all(tid);
 
   const participants = db.prepare(`
-    SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number
+    SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number,
+           on_stage_at, on_stage_duration_s
     FROM participants WHERE tournament_id = ? ORDER BY COALESCE(act_order, 9999), id
   `).all(tid);
 
@@ -296,6 +298,7 @@ function emitTiming(io, tid) {
 }
 
 // ── POST /api/coreo/participants/:id/on-stage ────────────────────────────────
+// Step 1: show participant on public screen (does NOT start the performance timer)
 router.post('/participants/:id/on-stage', (req, res) => {
   const pid = Number(req.params.id);
   const participant = db.prepare('SELECT * FROM participants WHERE id = ?').get(pid);
@@ -305,20 +308,19 @@ router.post('/participants/:id/on-stage', (req, res) => {
   const now = Date.now();
 
   const txn = db.transaction(() => {
-    // Save duration of whoever was previously on stage
+    // If previous participant had timer running, stop it and save duration
     const prev = db.prepare('SELECT id, on_stage_at FROM participants WHERE tournament_id = ? AND on_stage = 1').get(tid);
     if (prev?.on_stage_at) {
       const dur = (now - prev.on_stage_at) / 1000;
       db.prepare('UPDATE participants SET on_stage_duration_s = on_stage_duration_s + ?, on_stage_at = NULL WHERE id = ?').run(dur, prev.id);
     }
     db.prepare('UPDATE participants SET on_stage = 0 WHERE tournament_id = ?').run(tid);
-    db.prepare('UPDATE participants SET on_stage = 1, on_stage_at = ? WHERE id = ?').run(now, pid);
-    // First on-stage: activate tournament and record start time
-    db.prepare("UPDATE tournaments SET status = 'active', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'setup'").run(now, tid);
+    // on_stage = 1, reset timer fields for a clean run
+    db.prepare('UPDATE participants SET on_stage = 1, on_stage_at = NULL, on_stage_duration_s = 0 WHERE id = ?').run(pid);
   });
   txn();
 
-  const full = db.prepare('SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number FROM participants WHERE id = ?').get(pid);
+  const full = db.prepare('SELECT id, name, category, age_group, photo_path, act_order, on_stage, on_stage_at, on_stage_duration_s, academia, localidad, coreografo, round_number FROM participants WHERE id = ?').get(pid);
   const onStageData = { ...full, members: [] };
 
   db.prepare('UPDATE tournaments SET screen_state = ? WHERE id = ?').run(
@@ -329,21 +331,60 @@ router.post('/participants/:id/on-stage', (req, res) => {
   req.io.to(`screen:${tid}`).emit('coreo:on-stage', payload);
   req.io.to(`admin:${tid}`).emit('coreo:on-stage', payload);
   req.io.to(`judge:${tid}`).emit('coreo:on-stage', payload);
-  emitTiming(req.io, tid);
   res.json({ success: true, participant: onStageData });
 });
 
+// ── POST /api/coreo/participants/:id/timer/start ──────────────────────────────
+// Step 2: start the performance timer (actual judged performance begins)
+router.post('/participants/:id/timer/start', requireAdmin, (req, res) => {
+  const pid = Number(req.params.id);
+  const p = db.prepare('SELECT * FROM participants WHERE id = ?').get(pid);
+  if (!p || !p.on_stage) return res.status(400).json({ error: 'Participante no está en escena' });
+
+  const tid = p.tournament_id;
+  const now = Date.now();
+  db.prepare('UPDATE participants SET on_stage_at = ? WHERE id = ?').run(now, pid);
+  // First timer start activates the tournament
+  db.prepare("UPDATE tournaments SET status = 'active', started_at = COALESCE(started_at, ?) WHERE id = ? AND status = 'setup'").run(now, tid);
+  // Emit to admins and judges
+  req.io.to(`admin:${tid}`).to(`judge:${tid}`).emit('coreo:timer-started', { participantId: pid, on_stage_at: now });
+  emitTiming(req.io, tid);
+  res.json({ ok: true, on_stage_at: now });
+});
+
+// ── POST /api/coreo/participants/:id/timer/stop ───────────────────────────────
+// Step 3: stop the performance timer (performance ends, time is recorded)
+router.post('/participants/:id/timer/stop', requireAdmin, (req, res) => {
+  const pid = Number(req.params.id);
+  const p = db.prepare('SELECT * FROM participants WHERE id = ?').get(pid);
+  if (!p || !p.on_stage_at) return res.status(400).json({ error: 'Timer no activo' });
+
+  const tid = p.tournament_id;
+  const now = Date.now();
+  const dur = (now - p.on_stage_at) / 1000;
+  const total = (p.on_stage_duration_s || 0) + dur;
+  db.prepare('UPDATE participants SET on_stage_duration_s = ?, on_stage_at = NULL WHERE id = ?').run(total, pid);
+
+  req.io.to(`admin:${tid}`).to(`judge:${tid}`).emit('coreo:timer-stopped', { participantId: pid, on_stage_duration_s: total });
+  emitTiming(req.io, tid);
+  res.json({ ok: true, on_stage_duration_s: total });
+});
+
 // ── POST /api/coreo/tournaments/:id/off-stage ────────────────────────────────
+// Step 4: remove participant from screen (timer must already be stopped)
 router.post('/tournaments/:id/off-stage', (req, res) => {
   const tid = Number(req.params.id);
   const now = Date.now();
-  // Save duration of whoever was on stage
-  const prev = db.prepare('SELECT id, on_stage_at FROM participants WHERE tournament_id = ? AND on_stage = 1').get(tid);
-  if (prev?.on_stage_at) {
-    const dur = (now - prev.on_stage_at) / 1000;
-    db.prepare('UPDATE participants SET on_stage_duration_s = on_stage_duration_s + ?, on_stage_at = NULL WHERE id = ?').run(dur, prev.id);
+  // Safety: if timer is still running when clearing, save duration
+  const prev = db.prepare('SELECT id, on_stage_at, on_stage_duration_s FROM participants WHERE tournament_id = ? AND on_stage = 1').get(tid);
+  if (prev) {
+    if (prev.on_stage_at) {
+      const dur = (now - prev.on_stage_at) / 1000;
+      db.prepare('UPDATE participants SET on_stage_duration_s = ?, on_stage_at = NULL, on_stage = 0 WHERE id = ?').run((prev.on_stage_duration_s || 0) + dur, prev.id);
+    } else {
+      db.prepare('UPDATE participants SET on_stage = 0 WHERE id = ?').run(prev.id);
+    }
   }
-  db.prepare('UPDATE participants SET on_stage = 0 WHERE tournament_id = ?').run(tid);
   db.prepare('UPDATE tournaments SET screen_state = ? WHERE id = ?').run(JSON.stringify({ mode: 'idle' }), tid);
   req.io.to(`screen:${tid}`).emit('coreo:off-stage');
   req.io.to(`admin:${tid}`).emit('coreo:off-stage');
@@ -520,6 +561,24 @@ router.post('/tournaments/:id/finish', requireAdmin, (req, res) => {
   if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
   db.prepare("UPDATE tournaments SET status = 'finished' WHERE id = ?").run(tid);
   req.io.to(`screen:${tid}`).emit('coreo:tournament-finished', { tournamentId: tid });
+  res.json({ ok: true });
+});
+
+// ── POST /api/coreo/tournaments/:id/restart ───────────────────────────────────
+// Reset tournament to pre-start state: clear all timing data and scores
+router.post('/tournaments/:id/restart', requireAdmin, (req, res) => {
+  const tid = Number(req.params.id);
+  const tournament = db.prepare('SELECT id FROM tournaments WHERE id = ? AND tournament_type = ?').get(tid, 'coreografia');
+  if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
+
+  const txn = db.transaction(() => {
+    db.prepare("UPDATE tournaments SET status = 'setup', started_at = NULL WHERE id = ?").run(tid);
+    db.prepare('UPDATE participants SET on_stage = 0, on_stage_at = NULL, on_stage_duration_s = 0 WHERE tournament_id = ?').run(tid);
+    db.prepare('DELETE FROM choreography_scores WHERE tournament_id = ?').run(tid);
+  });
+  txn();
+
+  req.io.to(`admin:${tid}`).to(`judge:${tid}`).to(`coreo-speaker:${tid}`).to(`screen:${tid}`).emit('coreo:restarted', { tournamentId: tid });
   res.json({ ok: true });
 });
 

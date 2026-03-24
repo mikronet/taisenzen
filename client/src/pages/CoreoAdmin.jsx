@@ -7,7 +7,7 @@ const API = '/api/coreo';
 
 function apiFetch(url, options = {}) {
   const token = sessionStorage.getItem('adminToken') || '';
-  const orgCode = sessionStorage.getItem('coreoOrgCode') || '';
+  const orgCode = localStorage.getItem('coreoOrgCode') || '';
   return fetch(url, {
     ...options,
     headers: {
@@ -21,7 +21,7 @@ function apiFetch(url, options = {}) {
 
 function apiUpload(url, formData, method = 'POST') {
   const token = sessionStorage.getItem('adminToken') || '';
-  const orgCode = sessionStorage.getItem('coreoOrgCode') || '';
+  const orgCode = localStorage.getItem('coreoOrgCode') || '';
   return fetch(url, {
     method,
     headers: { 'x-admin-token': token, 'x-organizer-code': orgCode },
@@ -238,7 +238,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
 
   // ── Organizers ──
   const [newOrganizer, setNewOrganizer] = useState('');
-  const selfOrgCode = sessionStorage.getItem('coreoOrgCode');
+  const selfOrgCode = localStorage.getItem('coreoOrgCode');
   const addOrganizer = async (e) => {
     e.preventDefault();
     if (!newOrganizer.trim()) return;
@@ -393,12 +393,12 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
       </div>
     )}
 
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '56px', alignItems: 'start' }}>
       {/* ── Left column: event config ── */}
       <div>
         {/* Rounds */}
-        <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>NÚMERO DE BLOQUES</h3>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Los participantes se asignan a una bloque. El orden de actuación se agrupa: Bloque → Categoría → Participante.</p>
+        <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>NÚMERO DE BLOQUES</h3>
+        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Los participantes se asignan a una bloque. El orden de actuación se agrupa: Bloque → Categoría → Participante.</p>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <input
             type="number" min={1} max={20}
@@ -414,8 +414,8 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
         {SECTION_DIVIDER}
 
         {/* Categories */}
-        <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>CATEGORÍAS</h3>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Crea las categorías de este evento. El orden aquí determina el orden en los desplegables.</p>
+        <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CATEGORÍAS</h3>
+        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Crea las categorías de este evento. El orden aquí determina el orden en los desplegables.</p>
         <form onSubmit={addCategory} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
           <input
             placeholder="Nueva categoría (ej: Solo, Parejas, Grupo...)"
@@ -428,11 +428,11 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
           {catList.length === 0 && <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Sin categorías definidas.</p>}
           {catList.map((cat, i) => (
-            <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '8px 12px' }}>
-              <span style={{ flex: 1, color: categoryColor(cat), fontWeight: 600 }}>{cat}</span>
-              <button onClick={() => moveCategoryItem(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid #333', color: i === 0 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '2px 7px', cursor: i === 0 ? 'default' : 'pointer', fontSize: '0.8rem' }}>↑</button>
-              <button onClick={() => moveCategoryItem(i, 1)} disabled={i === catList.length - 1} style={{ background: 'none', border: '1px solid #333', color: i === catList.length - 1 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '2px 7px', cursor: i === catList.length - 1 ? 'default' : 'pointer', fontSize: '0.8rem' }}>↓</button>
-              <button onClick={() => removeCategory(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '2px 7px', cursor: 'pointer', fontSize: '0.8rem' }}>✕</button>
+            <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '10px 14px' }}>
+              <span style={{ flex: 1, color: categoryColor(cat), fontWeight: 600, fontSize: '0.95rem' }}>{cat}</span>
+              <button onClick={() => moveCategoryItem(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid #333', color: i === 0 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '4px 9px', cursor: i === 0 ? 'default' : 'pointer', fontSize: '0.85rem' }}>↑</button>
+              <button onClick={() => moveCategoryItem(i, 1)} disabled={i === catList.length - 1} style={{ background: 'none', border: '1px solid #333', color: i === catList.length - 1 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '4px 9px', cursor: i === catList.length - 1 ? 'default' : 'pointer', fontSize: '0.85rem' }}>↓</button>
+              <button onClick={() => removeCategory(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '4px 9px', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button>
             </div>
           ))}
         </div>
@@ -446,8 +446,8 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
         {SECTION_DIVIDER}
 
         {/* Criteria */}
-        <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>CRITERIOS DE PUNTUACIÓN</h3>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Define los criterios con los que los jueces puntuarán cada actuación.</p>
+        <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CRITERIOS DE PUNTUACIÓN</h3>
+        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Define los criterios con los que los jueces puntuarán cada actuación.</p>
         {criteriaList.map((c, i) => (
           <div key={c.id ?? i} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
             <input
@@ -477,8 +477,8 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
         {SECTION_DIVIDER}
 
         {/* Poster */}
-        <h3 style={{ color: '#7ecfff', marginBottom: '6px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>CARTEL DEL TORNEO</h3>
-        <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Imagen que aparece de fondo en la pantalla pública.</p>
+        <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CARTEL DEL TORNEO</h3>
+        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Imagen que aparece de fondo en la pantalla pública.</p>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '8px' }}>
           {tournament.poster_path ? (
             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -513,7 +513,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
       {/* ── Right column: judges + organizers ── */}
       <div>
         {/* Judges */}
-        <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>JUECES</h3>
+        <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '1rem' }}>JUECES</h3>
         {isAdmin && (
           <form onSubmit={addJudge} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <input placeholder="Nombre del juez" value={newJudge} onChange={e => setNewJudge(e.target.value)} style={{ flex: 1 }} />
@@ -522,79 +522,79 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {judges.map(j => (
-            <div key={j.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}>
+            <div key={j.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px' }}>
               <div>
-                <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{j.name}</div>
-                <div style={{ color: '#7ecfff', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: '3px' }}>{j.access_code}</div>
+                <div style={{ fontWeight: 700, fontSize: '1rem' }}>{j.name}</div>
+                <div style={{ color: '#7ecfff', fontSize: '0.85rem', fontFamily: 'monospace', marginTop: '4px' }}>{j.access_code}</div>
               </div>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-judge?code=${j.access_code}`, label: `JURADO · ${j.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#7ecfff' }}>QR</button>
-                <button onClick={() => window.open(`${window.location.origin}/coreo-judge?code=${j.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#7ecfff' }}>🔗</button>
-                {isAdmin && <button className="btn-danger" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => removeJudge(j.id)}>Eliminar</button>}
+                <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-judge?code=${j.access_code}`, label: `JURADO · ${j.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#7ecfff' }}>QR</button>
+                <button onClick={() => window.open(`${window.location.origin}/coreo-judge?code=${j.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#7ecfff' }}>🔗</button>
+                {isAdmin && <button className="btn-danger" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => removeJudge(j.id)}>Eliminar</button>}
               </div>
             </div>
           ))}
-          {judges.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', padding: '10px 0' }}>Sin jueces.</p>}
+          {judges.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.88rem', padding: '10px 0' }}>Sin jueces.</p>}
         </div>
-        <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(126,207,255,0.04)', borderRadius: '8px', border: '1px solid rgba(126,207,255,0.1)' }}>
-          <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>Acceso en <strong style={{ color: '#7ecfff' }}>/coreo-judge</strong></p>
+        <div style={{ marginTop: '10px', padding: '12px 16px', background: 'rgba(126,207,255,0.04)', borderRadius: '8px', border: '1px solid rgba(126,207,255,0.1)' }}>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', margin: 0 }}>Acceso en <strong style={{ color: '#7ecfff' }}>/coreo-judge</strong></p>
         </div>
 
         {isAdmin && (<>
           {SECTION_DIVIDER}
 
           {/* Organizers */}
-          <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>ORGANIZADORES</h3>
+          <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '1rem' }}>ORGANIZADORES</h3>
           <form onSubmit={addOrganizer} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <input placeholder="Nombre del organizador" value={newOrganizer} onChange={e => setNewOrganizer(e.target.value)} style={{ flex: 1 }} />
             <button type="submit" className="btn-primary">Crear</button>
           </form>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {organizers.map(o => (
-              <div key={o.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}>
+              <div key={o.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px' }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{o.name}</div>
-                  <div style={{ color: '#a78bfa', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: '3px' }}>{o.access_code}</div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem' }}>{o.name}</div>
+                  <div style={{ color: '#a78bfa', fontSize: '0.85rem', fontFamily: 'monospace', marginTop: '4px' }}>{o.access_code}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-organizer?code=${o.access_code}`, label: `ORGANIZADOR · ${o.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#a78bfa' }}>QR</button>
-                  <button onClick={() => window.open(`${window.location.origin}/coreo-organizer?code=${o.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#a78bfa' }}>🔗</button>
-                  {o.access_code !== selfOrgCode && <button className="btn-danger" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => removeOrganizer(o.id)}>Eliminar</button>}
+                  <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-organizer?code=${o.access_code}`, label: `ORGANIZADOR · ${o.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#a78bfa' }}>QR</button>
+                  <button onClick={() => window.open(`${window.location.origin}/coreo-organizer?code=${o.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#a78bfa' }}>🔗</button>
+                  {o.access_code !== selfOrgCode && <button className="btn-danger" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => removeOrganizer(o.id)}>Eliminar</button>}
                 </div>
               </div>
             ))}
-            {organizers.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', padding: '10px 0' }}>Sin organizadores.</p>}
+            {organizers.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.88rem', padding: '10px 0' }}>Sin organizadores.</p>}
           </div>
-          <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(167,139,250,0.04)', borderRadius: '8px', border: '1px solid rgba(167,139,250,0.1)' }}>
-            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>El organizador accede en <strong style={{ color: '#a78bfa' }}>/coreo-organizer</strong> con su código</p>
+          <div style={{ marginTop: '10px', padding: '12px 16px', background: 'rgba(167,139,250,0.04)', borderRadius: '8px', border: '1px solid rgba(167,139,250,0.1)' }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', margin: 0 }}>El organizador accede en <strong style={{ color: '#a78bfa' }}>/coreo-organizer</strong> con su código</p>
           </div>
 
           {SECTION_DIVIDER}
 
           {/* Staff */}
-          <h3 style={{ color: '#fb923c', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>STAFF</h3>
+          <h3 style={{ color: '#fb923c', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '1rem' }}>STAFF</h3>
           <form onSubmit={addSpeaker} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <input placeholder="Nombre del miembro de staff" value={newSpeaker} onChange={e => setNewSpeaker(e.target.value)} style={{ flex: 1 }} />
             <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg,#fb923c,#ea580c)', border: 'none' }}>Crear</button>
           </form>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {(speakers || []).map(s => (
-              <div key={s.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}>
+              <div key={s.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px' }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{s.name}</div>
-                  <div style={{ color: '#fb923c', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: '3px' }}>{s.access_code}</div>
+                  <div style={{ fontWeight: 700, fontSize: '1rem' }}>{s.name}</div>
+                  <div style={{ color: '#fb923c', fontSize: '0.85rem', fontFamily: 'monospace', marginTop: '4px' }}>{s.access_code}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-speaker?code=${s.access_code}`, label: `STAFF · ${s.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#fb923c' }}>QR</button>
-                  <button onClick={() => window.open(`${window.location.origin}/coreo-speaker?code=${s.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#fb923c' }}>🔗</button>
-                  <button className="btn-danger" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => removeSpeaker(s.id)}>Eliminar</button>
+                  <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-speaker?code=${s.access_code}`, label: `STAFF · ${s.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#fb923c' }}>QR</button>
+                  <button onClick={() => window.open(`${window.location.origin}/coreo-speaker?code=${s.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#fb923c' }}>🔗</button>
+                  <button className="btn-danger" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => removeSpeaker(s.id)}>Eliminar</button>
                 </div>
               </div>
             ))}
-            {!(speakers || []).length && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', padding: '10px 0' }}>Sin staff.</p>}
+            {!(speakers || []).length && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.88rem', padding: '10px 0' }}>Sin staff.</p>}
           </div>
-          <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(251,146,60,0.04)', borderRadius: '8px', border: '1px solid rgba(251,146,60,0.1)' }}>
-            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>El staff accede en <strong style={{ color: '#fb923c' }}>/coreo-speaker</strong> con su código</p>
+          <div style={{ marginTop: '10px', padding: '12px 16px', background: 'rgba(251,146,60,0.04)', borderRadius: '8px', border: '1px solid rgba(251,146,60,0.1)' }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', margin: 0 }}>El staff accede en <strong style={{ color: '#fb923c' }}>/coreo-speaker</strong> con su código</p>
           </div>
         </>)}
       </div>
@@ -1019,26 +1019,18 @@ function OrderTab({ tournamentId, participants, onUpdate }) {
 }
 
 // ── Staff chat panel ──────────────────────────────────────────────────────────
-function SpeakerMsgPanel({ tournamentId }) {
-  const socket = useSocket();
-  const [thread, setThread] = useState([]); // { dir: 'out'|'in', from, text, type, ranking, sentAt }
+// SpeakerMsgPanel is a controlled component: thread state lives in the root component
+// so messages aren't lost when the admin switches away from the en-vivo tab.
+function SpeakerMsgPanel({ tournamentId, thread, onAdd }) {
   const [msgText, setMsgText] = useState('');
   const [sending, setSending] = useState(false);
-  const [sendingRanking, setSendingRanking] = useState(false);
   const bottomRef = useRef(null);
-
-  useEffect(() => {
-    if (!socket) return;
-    const handler = (msg) => setThread(prev => [...prev, { dir: 'in', ...msg }]);
-    socket.on('coreo:staff-msg', handler);
-    return () => socket.off('coreo:staff-msg', handler);
-  }, [socket]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thread]);
 
-  const pushOut = (entry) => setThread(prev => [...prev, { dir: 'out', sentAt: Date.now(), ...entry }]);
+  const pushOut = (entry) => onAdd({ dir: 'out', sentAt: Date.now(), ...entry });
 
   const sendToStaff = async (type, payload) => {
     const res = await apiFetch(`${API}/tournaments/${tournamentId}/speaker/send`, {
@@ -1055,45 +1047,10 @@ function SpeakerMsgPanel({ tournamentId }) {
     finally { setSending(false); }
   };
 
-  const handleSendRanking = async () => {
-    setSendingRanking(true);
-    try {
-      const r = await apiFetch(`${API}/tournaments/${tournamentId}/scores/summary`);
-      const { criteria, participants } = await r.json();
-      const getTotal = (p) => {
-        const vals = criteria.map(c => p.criterionScores[c.id]).filter(v => v != null);
-        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-      };
-      const roundMap = {}; const roundOrder = [];
-      for (const p of participants) {
-        const round = p.round_number || 1; const cat = p.category || '—';
-        if (!roundMap[round]) { roundMap[round] = {}; roundOrder.push(round); }
-        if (!roundMap[round][cat]) roundMap[round][cat] = [];
-        roundMap[round][cat].push(p);
-      }
-      const ranking = roundOrder.map(round => ({
-        round,
-        categories: Object.keys(roundMap[round]).map(category => ({
-          category,
-          top3: [...roundMap[round][category]]
-            .sort((a, b) => { const ta = getTotal(a); const tb = getTotal(b); if (ta == null) return 1; if (tb == null) return -1; return tb - ta; })
-            .slice(0, 3).map(p => ({ name: p.name, total: getTotal(p) })),
-        })),
-      }));
-      await sendToStaff('ranking', { ranking });
-    } finally { setSendingRanking(false); }
-  };
-
   return (
     <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid #1a1a2e' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+      <div style={{ marginBottom: '12px' }}>
         <h3 style={{ color: '#fb923c', letterSpacing: '0.15em', fontSize: '0.85rem', margin: 0 }}>COMUNICACIÓN CON STAFF</h3>
-        <button
-          onClick={handleSendRanking} disabled={sendingRanking}
-          style={{ background: 'rgba(126,207,255,0.08)', border: '1px solid rgba(126,207,255,0.3)', color: '#7ecfff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}
-        >
-          {sendingRanking ? '...' : '🏆 Enviar ranking Top 3'}
-        </button>
       </div>
 
       {/* Thread */}
@@ -1114,7 +1071,7 @@ function SpeakerMsgPanel({ tournamentId }) {
               padding: '8px 12px',
             }}>
               {m.type === 'ranking' ? (
-                <span style={{ color: '#7ecfff', fontSize: '0.8rem', fontWeight: 600 }}>🏆 Ranking Top 3 enviado</span>
+                <span style={{ color: '#7ecfff', fontSize: '0.8rem', fontWeight: 600 }}>🏆 Ranking enviado</span>
               ) : (
                 <span style={{ color: '#f0f0f0', fontSize: '0.88rem', lineHeight: 1.4 }}>{m.text}</span>
               )}
@@ -1215,29 +1172,81 @@ function computeTiming(participants, now = Date.now()) {
 }
 
 // ── TimingWidget ──────────────────────────────────────────────────────────────
+// Stopwatch helpers: { running: bool, startMs: number|null, pausedMs: number }
+const _twStart = (t, now) => ({ running: true, startMs: now - (t?.pausedMs ?? 0), pausedMs: 0 });
+const _twPause = (t, now) => ({ running: false, startMs: null, pausedMs: t?.running ? now - t.startMs : (t?.pausedMs ?? 0) });
+const _twReset = () => ({ running: false, startMs: null, pausedMs: 0 });
+const _twElapsed = (t, now) => !t ? 0 : t.running ? now - t.startMs : (t.pausedMs ?? 0);
+
 function TimingWidget({ timing, tournamentStatus }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    if (tournamentStatus !== 'active') return;
     const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
-  }, [tournamentStatus]);
+  }, []);
+
+  // Independent stopwatches for tournament / blocks / categories
+  const [tourTimer, setTourTimer] = useState(null);
+  const [blockTimers, setBlockTimers] = useState({});
+  const [catTimers, setCatTimers] = useState({});
+  const didInitTour = useRef(false);
+
+  // Auto-init tournament timer from started_at (first time only)
+  useEffect(() => {
+    if (timing?.started_at && !didInitTour.current) {
+      didInitTour.current = true;
+      setTourTimer({ running: tournamentStatus === 'active', startMs: timing.started_at, pausedMs: 0 });
+    }
+  }, [timing?.started_at, tournamentStatus]);
+
+  // Auto-start all timers when a participant begins performing
+  useEffect(() => {
+    const active = timing?.participants?.find(p => p.on_stage_at);
+    if (!active) return;
+    const nowMs = Date.now();
+    const bKey = String(active.round_number || 1);
+    const cKey = `${active.round_number || 1}:${active.category || '—'}`;
+    setTourTimer(prev => prev?.running ? prev : { running: true, startMs: nowMs - (prev?.pausedMs ?? 0), pausedMs: 0 });
+    setBlockTimers(prev => prev[bKey]?.running ? prev : { ...prev, [bKey]: { running: true, startMs: nowMs - (prev[bKey]?.pausedMs ?? 0), pausedMs: 0 } });
+    setCatTimers(prev => prev[cKey]?.running ? prev : { ...prev, [cKey]: { running: true, startMs: nowMs - (prev[cKey]?.pausedMs ?? 0), pausedMs: 0 } });
+  }, [timing?.participants]);
 
   if (!timing?.started_at) return null;
 
   const { blocks, blockTotals, globalAvg } = computeTiming(timing.participants, now);
   const roundOrder = Object.keys(blocks).map(Number).sort((a, b) => a - b);
 
+  const btnSt = {
+    background: 'rgba(126,207,255,0.1)', border: '1px solid rgba(126,207,255,0.2)',
+    borderRadius: '4px', color: '#7ecfff', fontSize: '0.72rem',
+    padding: '1px 7px', cursor: 'pointer', lineHeight: '1.5',
+  };
+
+  const TimerRow = ({ ms, label, timer, onSet }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap' }}>
+      <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem', letterSpacing: '0.15em' }}>{label}</span>
+      <span style={{ color: '#7ecfff', fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.05em' }}>
+        {fmtElapsed(0, ms)}
+      </span>
+      {timer?.running
+        ? <button style={btnSt} onClick={() => onSet(_twPause(timer, now))}>⏸</button>
+        : <button style={btnSt} onClick={() => onSet(_twStart(timer, now))}>▶</button>}
+      <button style={btnSt} onClick={() => onSet(_twReset())}>↺</button>
+    </div>
+  );
+
+  const tourMs = _twElapsed(tourTimer, now);
+
   return (
     <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px' }}>
       {/* Cronómetro total */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.65rem', letterSpacing: '0.15em' }}>⏱ TORNEO</span>
-          <span style={{ color: '#7ecfff', fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.05em' }}>
-            {fmtElapsed(timing.started_at, tournamentStatus === 'active' ? now : timing.started_at + (timing.finished_duration_s ?? 0) * 1000)}
-          </span>
-        </div>
+        <TimerRow
+          ms={tourMs}
+          label="⏱ TORNEO"
+          timer={tourTimer ?? _twReset()}
+          onSet={setTourTimer}
+        />
         {globalAvg != null && (
           <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem' }}>
             media/actuación: <span style={{ color: 'rgba(255,255,255,0.5)' }}>{fmtDuration(globalAvg)}</span>
@@ -1250,10 +1259,18 @@ function TimingWidget({ timing, tournamentStatus }) {
         const bt = blockTotals[round];
         const cats = blocks[round];
         const catEntries = Object.entries(cats);
+        const bKey = String(round);
+        const bTimer = blockTimers[bKey];
+        const bMs = _twElapsed(bTimer, now);
         return (
           <div key={round} style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
-              <span style={{ color: '#7ecfff', fontSize: '0.68rem', letterSpacing: '0.15em', fontWeight: 700 }}>BLOQUE {round}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+              <TimerRow
+                ms={bMs}
+                label={`BLOQUE ${round}`}
+                timer={bTimer ?? _twReset()}
+                onSet={t => setBlockTimers(prev => ({ ...prev, [bKey]: t }))}
+              />
               <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>{bt.done}/{bt.total} actuados</span>
               {bt.remaining != null && bt.remaining > 1 && (
                 <span style={{ color: '#fb923c', fontSize: '0.72rem' }}>est. restante: {fmtDuration(bt.remaining)}</span>
@@ -1264,18 +1281,29 @@ function TimingWidget({ timing, tournamentStatus }) {
             </div>
             {/* Por categoría */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingLeft: '8px' }}>
-              {catEntries.map(([cat, s]) => (
-                <div key={cat} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '4px 9px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: categoryColor(cat), fontWeight: 700 }}>{cat}</span>
-                  <span style={{ color: 'rgba(255,255,255,0.35)' }}>{s.done}/{s.total}</span>
-                  {s.remaining != null && s.remaining > 1 && (
-                    <span style={{ color: '#fb923c' }}>~{fmtDuration(s.remaining)}</span>
-                  )}
-                  {s.remaining != null && s.remaining <= 1 && s.total > 0 && (
-                    <span style={{ color: '#34d399' }}>✓</span>
-                  )}
-                </div>
-              ))}
+              {catEntries.map(([cat, s]) => {
+                const cKey = `${round}:${cat}`;
+                const cTimer = catTimers[cKey];
+                const cMs = _twElapsed(cTimer, now);
+                return (
+                  <div key={cat} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <span style={{ color: categoryColor(cat), fontWeight: 700, fontSize: '0.7rem' }}>{cat}</span>
+                    <TimerRow
+                      ms={cMs}
+                      label=""
+                      timer={cTimer ?? _twReset()}
+                      onSet={t => setCatTimers(prev => ({ ...prev, [cKey]: t }))}
+                    />
+                    <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem' }}>{s.done}/{s.total}</span>
+                    {s.remaining != null && s.remaining > 1 && (
+                      <span style={{ color: '#fb923c', fontSize: '0.7rem' }}>~{fmtDuration(s.remaining)}</span>
+                    )}
+                    {s.remaining != null && s.remaining <= 1 && s.total > 0 && (
+                      <span style={{ color: '#34d399', fontSize: '0.7rem' }}>✓</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -1284,95 +1312,310 @@ function TimingWidget({ timing, tournamentStatus }) {
   );
 }
 
-function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus }) {
-  const [onStageId, setOnStageId] = useState(() => participants.find(p => p.on_stage)?.id ?? null);
+function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd }) {
   const [loading, setLoading] = useState(null);
+  const [nowMs, setNowMs] = useState(Date.now());
+  // Local participant state (augments parent state with real-time timer fields)
+  const [localParts, setLocalParts] = useState(participants);
+  useEffect(() => { setLocalParts(participants); }, [participants]);
 
-  const rounds = (() => {
-    const sorted = [...participants].sort((a, b) => (a.act_order ?? 9999) - (b.act_order ?? 9999));
-    const map = {}; const order = [];
-    for (const p of sorted) {
-      const r = p.round_number || 1;
-      if (!map[r]) { map[r] = []; order.push(r); }
-      map[r].push(p);
-    }
-    return order.map(r => ({ round: r, participants: map[r] }));
-  })();
+  // Collapse state for blocks and categories
+  const [collapsedBlocks, setCollapsedBlocks] = useState({});
+  const [collapsedCats, setCollapsedCats] = useState({});
+  const toggleBlock = (r) => setCollapsedBlocks(prev => ({ ...prev, [r]: !prev[r] }));
+  const toggleCat = (key) => setCollapsedCats(prev => ({ ...prev, [key]: !prev[key] }));
+
+  // allVotedMap: { [participantId]: true } — set when all judges have voted
+  const [allVotedMap, setAllVotedMap] = useState({});
+
+  const loadVotes = useCallback(async () => {
+    const r = await apiFetch(`/api/coreo/tournaments/${tournamentId}/scores/summary`);
+    if (!r.ok) return;
+    const d = await r.json();
+    const map = {};
+    for (const p of (d.participants || [])) { if (p.allVoted) map[p.id] = true; }
+    setAllVotedMap(map);
+  }, [tournamentId]);
+
+  useEffect(() => { loadVotes(); }, [loadVotes]);
 
   useEffect(() => {
-    setOnStageId(participants.find(p => p.on_stage)?.id ?? null);
-  }, [participants]);
+    const iv = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, []);
 
-  const setOnStage = async (pid) => {
-    setLoading(pid);
+  const socket = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+    socket.on('coreo:timer-started', ({ participantId, on_stage_at }) => {
+      setLocalParts(prev => prev.map(p => p.id === participantId ? { ...p, on_stage_at } : p));
+    });
+    socket.on('coreo:timer-stopped', ({ participantId, on_stage_duration_s }) => {
+      setLocalParts(prev => prev.map(p => p.id === participantId ? { ...p, on_stage_at: null, on_stage_duration_s } : p));
+    });
+    socket.on('coreo:scores-updated', loadVotes);
+    return () => {
+      socket.off('coreo:timer-started');
+      socket.off('coreo:timer-stopped');
+      socket.off('coreo:scores-updated', loadVotes);
+    };
+  }, [socket, loadVotes]);
+
+  const fmtTimer = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+  // Participant stage state: idle | shown | timing | finalized | done | pending_votes
+  // done          = performed + all judges voted
+  // pending_votes = performed + waiting for remaining judge votes
+  const stageState = (p) => {
+    if (!p.on_stage) {
+      if (p.on_stage_duration_s > 0) return allVotedMap[p.id] ? 'done' : 'pending_votes';
+      return 'idle';
+    }
+    if (p.on_stage_at) return 'timing';
+    if (p.on_stage_duration_s > 0) return 'finalized';
+    return 'shown';
+  };
+
+  const rounds = (() => {
+    const sorted = [...localParts].sort((a, b) => (a.act_order ?? 9999) - (b.act_order ?? 9999));
+    const roundMap = {}; const roundOrder = [];
+    for (const p of sorted) {
+      const r = p.round_number || 1;
+      const cat = p.category || '—';
+      if (!roundMap[r]) { roundMap[r] = { catMap: {}, catOrder: [] }; roundOrder.push(r); }
+      if (!roundMap[r].catMap[cat]) { roundMap[r].catMap[cat] = []; roundMap[r].catOrder.push(cat); }
+      roundMap[r].catMap[cat].push(p);
+    }
+    return roundOrder.map(r => ({
+      round: r,
+      categories: roundMap[r].catOrder.map(cat => ({ cat, participants: roundMap[r].catMap[cat] })),
+    }));
+  })();
+
+  const allSorted = rounds.flatMap(r => r.categories.flatMap(c => c.participants));
+  const partIdxMap = Object.fromEntries(allSorted.map((p, i) => [p.id, i + 1]));
+  const onStageP = localParts.find(p => p.on_stage);
+  const onStageIdx = onStageP ? allSorted.findIndex(p => p.id === onStageP?.id) : -1;
+  const nextIdleId = allSorted.slice(onStageIdx + 1).find(p => stageState(p) === 'idle')?.id ?? null;
+
+  const doOnStage = async (pid) => {
+    setLoading(pid + ':stage');
     try {
       const res = await apiFetch(`${API}/participants/${pid}/on-stage`, { method: 'POST' });
       if (!res.ok) return;
-      setOnStageId(pid);
-      onUpdate(participants.map(p => ({ ...p, on_stage: p.id === pid ? 1 : 0 })));
+      setLocalParts(prev => prev.map(p => p.id === pid
+        ? { ...p, on_stage: 1, on_stage_at: null, on_stage_duration_s: 0 }
+        : { ...p, on_stage: 0 }
+      ));
+      onUpdate(participants.map(p => p.id === pid
+        ? { ...p, on_stage: 1, on_stage_at: null, on_stage_duration_s: 0 }
+        : { ...p, on_stage: 0 }
+      ));
     } finally { setLoading(null); }
   };
 
-  const clearStage = async () => {
-    await apiFetch(`${API}/tournaments/${tournamentId}/off-stage`, { method: 'POST' });
-    setOnStageId(null);
-    onUpdate(participants.map(p => ({ ...p, on_stage: 0 })));
+  const doTimerStart = async (pid) => {
+    setLoading(pid + ':start');
+    try {
+      const res = await apiFetch(`${API}/participants/${pid}/timer/start`, { method: 'POST' });
+      if (!res.ok) return;
+      const d = await res.json();
+      setLocalParts(prev => prev.map(p => p.id === pid ? { ...p, on_stage_at: d.on_stage_at } : p));
+    } finally { setLoading(null); }
   };
 
+  const doTimerStop = async (pid) => {
+    setLoading(pid + ':stop');
+    try {
+      const res = await apiFetch(`${API}/participants/${pid}/timer/stop`, { method: 'POST' });
+      if (!res.ok) return;
+      const d = await res.json();
+      setLocalParts(prev => prev.map(p => p.id === pid ? { ...p, on_stage_at: null, on_stage_duration_s: d.on_stage_duration_s } : p));
+    } finally { setLoading(null); }
+  };
+
+  const doClearStage = async () => {
+    setLoading('clear');
+    try {
+      await apiFetch(`${API}/tournaments/${tournamentId}/off-stage`, { method: 'POST' });
+      setLocalParts(prev => prev.map(p => ({ ...p, on_stage: 0, on_stage_at: null })));
+      onUpdate(prev => prev.map(p => ({ ...p, on_stage: 0, on_stage_at: null })));
+    } finally { setLoading(null); }
+  };
+
+  const elapsedS = onStageP?.on_stage_at
+    ? Math.max(0, Math.floor((nowMs - onStageP.on_stage_at) / 1000))
+    : null;
+
   return (
-    <div>
+    <div style={{ display: 'flex', height: 'calc(100vh - 109px)', overflow: 'hidden' }}>
+
+      {/* ── Left: control panel ── */}
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', borderRight: '1px solid #1a1a2e', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
         <TimingWidget timing={timing} tournamentStatus={tournamentStatus} />
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: 0 }}>CONTROL DE ESCENA</h3>
-          {onStageId && (
-            <button onClick={clearStage} style={{ background: 'none', border: '1px solid #555', color: '#888', fontSize: '0.75rem', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer' }}>Limpiar escena</button>
-          )}
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {rounds.length === 0 && <p style={{ color: 'rgba(255,255,255,0.3)', padding: '20px', textAlign: 'center' }}>No hay participantes.</p>}
-          {rounds.map(({ round, participants: rps }) => {
-            let globalIdx = rounds.slice(0, rounds.indexOf(rounds.find(r => r.round === round))).reduce((n, r) => n + r.participants.length, 0);
-            return (
-              <div key={round}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <span style={{ color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", fontSize: '1rem', letterSpacing: '0.2em' }}>BLOQUE {round}</span>
-                  <span style={{ flex: 1, height: '1px', background: 'rgba(126,207,255,0.15)' }} />
-                  <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.72rem' }}>{rps.length} grupos</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {rps.map(p => {
-                    globalIdx++;
-                    const isOnStage = p.id === onStageId;
+
+        {/* Live on-stage timer card */}
+        {onStageP?.on_stage_at && elapsedS !== null && (
+          <div style={{ background: 'rgba(126,207,255,0.06)', border: '1px solid rgba(126,207,255,0.35)', borderRadius: '10px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.62rem', letterSpacing: '0.18em', marginBottom: '4px' }}>EN ESCENA AHORA</div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>{onStageP?.name}</div>
+              <div style={{ color: categoryColor(onStageP?.category), fontSize: '0.65rem', letterSpacing: '0.1em', marginTop: '2px' }}>{onStageP?.category}</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ color: '#7ecfff', fontFamily: 'monospace', fontSize: '2rem', fontWeight: 700, lineHeight: 1 }}>{fmtTimer(elapsedS)}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Participant list */}
+        <div>
+          <h3 style={{ color: '#fb923c', letterSpacing: '0.12em', fontSize: '0.82rem', margin: '0 0 12px 0' }}>CONTROL DE ESCENA</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {rounds.length === 0 && (
+              <p style={{ color: 'rgba(255,255,255,0.3)', padding: '20px', textAlign: 'center', fontSize: '0.85rem' }}>No hay participantes.</p>
+            )}
+            {(() => {
+              return rounds.map(({ round, categories }) => {
+                const bCollapsed = !!collapsedBlocks[round];
+                return (
+                <div key={round}>
+                  <div onClick={() => toggleBlock(round)} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: bCollapsed ? 0 : '8px', cursor: 'pointer', userSelect: 'none' }}>
+                    <span style={{ color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", fontSize: '0.85rem', letterSpacing: '0.2em' }}>BLOQUE {round}</span>
+                    <span style={{ flex: 1, height: '1px', background: 'rgba(126,207,255,0.12)' }} />
+                    <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem' }}>{categories.reduce((n, c) => n + c.participants.length, 0)}</span>
+                    <span style={{ color: 'rgba(126,207,255,0.4)', fontSize: '0.65rem', marginLeft: '2px' }}>{bCollapsed ? '▶' : '▼'}</span>
+                  </div>
+                  {!bCollapsed && <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {categories.map(({ cat, participants: cps }) => {
+                    const cKey = `${round}:${cat}`;
+                    const cCollapsed = !!collapsedCats[cKey];
                     return (
-                      <div key={p.id} className="card" style={{ display: 'flex', gap: '12px', alignItems: 'center', padding: '12px 16px', border: isOnStage ? '1px solid rgba(126,207,255,0.5)' : '1px solid #1a1a2e', background: isOnStage ? 'rgba(126,207,255,0.06)' : undefined }}>
-                        <span style={{ color: 'rgba(255,255,255,0.3)', minWidth: '22px', fontSize: '0.85rem' }}>{globalIdx}</span>
-                        {p.photo_path && <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{p.name}</div>
-                          <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
-                            <span style={{ color: categoryColor(p.category), fontSize: '0.65rem', letterSpacing: '0.1em' }}>{p.category}</span>
+                    <div key={cat}>
+                      <div onClick={() => toggleCat(cKey)} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: cCollapsed ? 0 : '4px', paddingLeft: '4px', cursor: 'pointer', userSelect: 'none' }}>
+                        <span style={{ color: categoryColor(cat), fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{cat === '—' ? 'Sin categoría' : cat}</span>
+                        <span style={{ flex: 1, height: '1px', background: `${categoryColor(cat)}22` }} />
+                        <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>{cps.length}</span>
+                        <span style={{ color: `${categoryColor(cat)}88`, fontSize: '0.6rem', marginLeft: '2px' }}>{cCollapsed ? '▶' : '▼'}</span>
+                      </div>
+                      {!cCollapsed && <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                      {cps.map(p => {
+                        const idx = partIdxMap[p.id];
+                      const ss = stageState(p);
+                      const isNext = ss === 'idle' && p.id === nextIdleId && !onStageP;
+                      const rowBorder = ss === 'shown' || ss === 'timing'
+                        ? '1px solid rgba(126,207,255,0.5)'
+                        : isNext ? '1px solid rgba(251,146,60,0.4)'
+                        : '1px solid #1a1a2e';
+                      const rowBg = ss === 'shown' || ss === 'timing'
+                        ? 'rgba(126,207,255,0.07)'
+                        : isNext ? 'rgba(251,146,60,0.06)'
+                        : 'transparent';
+                      const isDimmed = ss === 'done' || ss === 'pending_votes';
+                      const pElapsed = ss === 'timing' && p.on_stage_at
+                        ? Math.max(0, Math.floor((nowMs - p.on_stage_at) / 1000))
+                        : null;
+                      return (
+                        <div key={p.id} style={{
+                          display: 'flex', gap: '10px', alignItems: 'center', padding: '9px 12px',
+                          borderRadius: '8px', border: rowBorder, background: rowBg,
+                          opacity: isDimmed ? 0.45 : 1,
+                        }}>
+                          <span style={{ color: 'rgba(255,255,255,0.2)', minWidth: '18px', fontSize: '0.75rem' }}>{idx}</span>
+                          {p.photo_path && <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} />}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: ss !== 'idle' || isNext ? 700 : 400, fontSize: '0.88rem', color: isDimmed ? 'rgba(255,255,255,0.4)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                            {p.academia && <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.academia}</div>}
+                          </div>
+                          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {ss === 'idle' && (
+                              <button
+                                onClick={() => doOnStage(p.id)} disabled={!!loading}
+                                style={{ background: isNext ? 'linear-gradient(135deg,#fb923c,#ea580c)' : 'none', border: isNext ? 'none' : '1px solid #2a2a3e', color: isNext ? '#fff' : '#888', fontWeight: isNext ? 700 : 400, fontSize: '0.7rem', padding: isNext ? '5px 11px' : '4px 9px', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '0.05em' }}>
+                                {loading === p.id + ':stage' ? '...' : isNext ? 'SIGUIENTE →' : 'EN ESCENA'}
+                              </button>
+                            )}
+                            {ss === 'shown' && (
+                              <>
+                                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#7ecfff', boxShadow: '0 0 8px #7ecfff', display: 'inline-block', animation: 'liveTabPulse 1.5s ease-in-out infinite' }} />
+                                <button
+                                  onClick={() => doTimerStart(p.id)} disabled={!!loading}
+                                  style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '0.7rem', padding: '5px 11px', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '0.05em' }}>
+                                  {loading === p.id + ':start' ? '...' : 'INICIAR'}
+                                </button>
+                              </>
+                            )}
+                            {ss === 'timing' && (
+                              <>
+                                <span style={{ color: '#7ecfff', fontFamily: 'monospace', fontSize: '1rem', fontWeight: 700, minWidth: '48px', textAlign: 'right' }}>{fmtTimer(pElapsed ?? 0)}</span>
+                                <button
+                                  onClick={() => doTimerStop(p.id)} disabled={!!loading}
+                                  style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '0.7rem', padding: '5px 11px', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: '0.05em' }}>
+                                  {loading === p.id + ':stop' ? '...' : 'FINALIZAR'}
+                                </button>
+                              </>
+                            )}
+                            {ss === 'finalized' && (
+                              <>
+                                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', fontFamily: 'monospace' }}>✓ {fmtTimer(Math.round(p.on_stage_duration_s))}</span>
+                                <button
+                                  onClick={() => doClearStage()} disabled={!!loading}
+                                  style={{ background: 'none', border: '1px solid #3a3a4e', color: '#666', fontSize: '0.7rem', padding: '4px 9px', borderRadius: '6px', cursor: loading ? 'not-allowed' : 'pointer' }}>
+                                  {loading === 'clear' ? '...' : 'LIMPIAR'}
+                                </button>
+                              </>
+                            )}
+                            {ss === 'done' && (
+                              <span style={{ color: '#34d399', fontSize: '0.75rem', fontFamily: 'monospace' }}>✓ {fmtTimer(Math.round(p.on_stage_duration_s))}</span>
+                            )}
+                            {ss === 'pending_votes' && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', fontFamily: 'monospace' }}>{fmtTimer(Math.round(p.on_stage_duration_s))}</span>
+                                <span style={{ color: '#fb923c', fontSize: '0.65rem', letterSpacing: '0.06em' }}>⏳ votos</span>
+                              </div>
+                            )}
                           </div>
                         </div>
-                        {isOnStage ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', boxShadow: '0 0 8px #7ecfff', display: 'inline-block' }} />
-                            <span style={{ color: '#7ecfff', fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em' }}>EN ESCENA</span>
-                          </div>
-                        ) : (
-                          <button className="btn-secondary" style={{ fontSize: '0.78rem', padding: '6px 12px' }}
-                            onClick={() => setOnStage(p.id)} disabled={loading === p.id}>
-                            {loading === p.id ? '...' : 'Poner en escena'}
-                          </button>
-                        )}
-                      </div>
-                    );
+                      );
+                      })}
+                      </div>}
+                    </div>
+                  );
                   })}
+                  </div>}
                 </div>
-              </div>
-            );
-          })}
+              );
+              });
+            })()}
+          </div>
         </div>
-      <SpeakerMsgPanel tournamentId={tournamentId} />
+
+        {/* Messaging to staff */}
+        <div style={{ borderTop: '1px solid #1a1a2e', paddingTop: '16px' }}>
+          <SpeakerMsgPanel tournamentId={tournamentId} thread={staffThread} onAdd={onStaffAdd} />
+        </div>
+      </div>
+
+      {/* ── Right: public screen preview ── */}
+      <div style={{ flex: 1, minWidth: 0, background: '#000', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: '10px', right: '12px', zIndex: 10, display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: '0.62rem', letterSpacing: '0.14em', padding: '3px 8px', background: 'rgba(0,0,0,0.6)', borderRadius: '4px' }}>PANTALLA PÚBLICA</span>
+          <button onClick={() => window.open(`/coreo-screen/${tournamentId}`, '_blank')} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid #2a2a3e', color: '#666', fontSize: '0.62rem', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}>⤢ Abrir</button>
+        </div>
+        <iframe
+          src={`/coreo-screen/${tournamentId}`}
+          style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
+          title="Pantalla pública"
+        />
+      </div>
+
+      <style>{`
+        @keyframes liveTabPulse {
+          0%, 100% { opacity: 1; box-shadow: 0 0 6px #7ecfff, 0 0 12px #7ecfff; }
+          50%       { opacity: 0.5; box-shadow: 0 0 3px #7ecfff; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -1395,7 +1638,8 @@ function OrganizerLogin({ onLogin }) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Código no válido'); return; }
-      sessionStorage.setItem('coreoOrgCode', code.trim());
+      localStorage.setItem('coreoOrgCode', code.trim());
+      localStorage.setItem('coreoOrgName', data.organizer.name);
       onLogin(data.organizer);
     } finally { setLoading(false); }
   };
@@ -1429,6 +1673,25 @@ function ScoresTab({ tournamentId }) {
   const socket = useSocket();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sendingRanking, setSendingRanking] = useState({}); // { 'round:cat': true }
+
+  const sendCategoryRanking = async (round, cat, catParts) => {
+    const key = `${round}:${cat}`;
+    setSendingRanking(prev => ({ ...prev, [key]: true }));
+    try {
+      const top3 = [...catParts]
+        .filter(p => p.globalAvg != null)
+        .sort((a, b) => b.globalAvg - a.globalAvg)
+        .slice(0, 3)
+        .map(p => ({ name: p.name, total: p.globalAvg }));
+      await apiFetch(`/api/coreo/tournaments/${tournamentId}/speaker/send`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'ranking', ranking: [{ round, categories: [{ category: cat, top3 }] }] }),
+      });
+    } finally {
+      setSendingRanking(prev => ({ ...prev, [key]: false }));
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1504,10 +1767,23 @@ function ScoresTab({ tournamentId }) {
             BLOQUE {round}
           </div>
 
-          {categories.map(({ cat, participants: catParts }) => (
+          {categories.map(({ cat, participants: catParts }) => {
+            const catComplete = catParts.length > 0 && catParts.every(p => p.allVoted);
+            const rankKey = `${round}:${cat}`;
+            return (
             <div key={cat} style={{ marginBottom: '28px' }}>
-              <div style={{ color: categoryColor(cat), fontSize: '0.72rem', letterSpacing: '0.18em', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase' }}>
-                {cat}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                <div style={{ color: categoryColor(cat), fontSize: '0.72rem', letterSpacing: '0.18em', fontWeight: 700, textTransform: 'uppercase' }}>
+                  {cat}
+                </div>
+                {catComplete && (
+                  <button
+                    onClick={() => sendCategoryRanking(round, cat, catParts)}
+                    disabled={sendingRanking[rankKey]}
+                    style={{ marginLeft: 'auto', background: 'rgba(126,207,255,0.08)', border: '1px solid rgba(126,207,255,0.3)', color: '#7ecfff', padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.05em' }}>
+                    {sendingRanking[rankKey] ? '...' : '🏆 Enviar ranking'}
+                  </button>
+                )}
               </div>
               <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a1a2e' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
@@ -1563,7 +1839,8 @@ function ScoresTab({ tournamentId }) {
                 </table>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       ))}
     </div>
@@ -1587,9 +1864,13 @@ export default function CoreoAdmin() {
   const [toast, setToast] = useState(null);
   const [notFound, setNotFound] = useState(false);
 
+  // Staff communication thread — lives here so messages survive tab switches
+  const [staffThread, setStaffThread] = useState([]);
+  const addToStaffThread = useCallback((entry) => setStaffThread(prev => [...prev, entry]), []);
+
   // Auth state: could be admin token or organizer code
   const isAdmin = !!sessionStorage.getItem('adminToken');
-  const hasOrgCode = !!sessionStorage.getItem('coreoOrgCode');
+  const hasOrgCode = !!localStorage.getItem('coreoOrgCode');
   const [needsOrgLogin, setNeedsOrgLogin] = useState(false);
 
   const load = useCallback(async () => {
@@ -1646,20 +1927,33 @@ export default function CoreoAdmin() {
     socket.on('coreo:organizer-removed', ({ id: oid }) => setOrganizers(prev => prev.filter(o => o.id !== oid)));
     socket.on('coreo:speaker-added', ({ speaker }) => setSpeakers(prev => [...prev, speaker]));
     socket.on('coreo:speaker-removed', ({ id: sid }) => setSpeakers(prev => prev.filter(s => s.id !== sid)));
-    socket.on('coreo:on-stage', ({ participant }) => setParticipants(prev => prev.map(p => ({ ...p, on_stage: p.id === participant.id ? 1 : 0 }))));
-    socket.on('coreo:off-stage', () => setParticipants(prev => prev.map(p => ({ ...p, on_stage: 0 }))));
+    socket.on('coreo:on-stage', ({ participant }) => setParticipants(prev => prev.map(p =>
+      p.id === participant.id
+        ? { ...p, on_stage: 1, on_stage_at: null, on_stage_duration_s: 0 }
+        : { ...p, on_stage: 0 }
+    )));
+    socket.on('coreo:off-stage', () => setParticipants(prev => prev.map(p => ({ ...p, on_stage: 0, on_stage_at: null }))));
+    socket.on('coreo:timer-started', ({ participantId, on_stage_at }) => setParticipants(prev => prev.map(p =>
+      p.id === participantId ? { ...p, on_stage_at } : p
+    )));
+    socket.on('coreo:timer-stopped', ({ participantId, on_stage_duration_s }) => setParticipants(prev => prev.map(p =>
+      p.id === participantId ? { ...p, on_stage_at: null, on_stage_duration_s } : p
+    )));
     socket.on('coreo:poster-updated', ({ poster_path }) => setTournament(prev => prev ? { ...prev, poster_path } : prev));
     socket.on('coreo:timing-updated', setTiming);
+    socket.on('coreo:staff-msg', (msg) => addToStaffThread({ dir: 'in', ...msg }));
+    socket.on('coreo:restarted', () => { load(); loadTiming(); });
     return () => {
       socket.off('connect', join);
       ['coreo:criteria-updated', 'coreo:config-updated', 'coreo:participant-added',
         'coreo:participant-updated', 'coreo:participant-removed', 'coreo:order-updated',
         'coreo:judge-added', 'coreo:judge-removed', 'coreo:organizer-added',
         'coreo:organizer-removed', 'coreo:speaker-added', 'coreo:speaker-removed',
-        'coreo:on-stage', 'coreo:off-stage', 'coreo:poster-updated',
-        'coreo:timing-updated'].forEach(e => socket.off(e));
+        'coreo:on-stage', 'coreo:off-stage', 'coreo:timer-started', 'coreo:timer-stopped',
+        'coreo:poster-updated', 'coreo:timing-updated', 'coreo:staff-msg',
+        'coreo:restarted'].forEach(e => socket.off(e));
     };
-  }, [socket, id, load, loadTiming]);
+  }, [socket, id, load, loadTiming, addToStaffThread]);
 
   if (needsOrgLogin) {
     return <OrganizerLogin onLogin={(org) => {
@@ -1695,10 +1989,10 @@ export default function CoreoAdmin() {
         { key: 'config', label: <span>Configuración{tabDot(configOk)}</span> },
         { key: 'participantes', label: <span>Participantes ({participants.length}){tabDot(participantesOk)}</span> },
         { key: 'orden', label: <span>Orden{tabDot(ordenOk)}</span> },
-        { key: 'en-vivo', label: 'En escena' },
         { key: 'puntuaciones', label: 'Puntuaciones' },
+        { key: 'en-vivo', label: '▶ En escena', accent: true },
       ]
-    : [{ key: 'en-vivo', label: 'En escena' }];
+    : [{ key: 'en-vivo', label: '▶ En escena', accent: true }];
 
   const activeTab = TABS.find(t => t.key === tab) ? tab : TABS[0].key;
 
@@ -1707,7 +2001,7 @@ export default function CoreoAdmin() {
       sessionStorage.removeItem('adminToken');
       navigate('/admin');
     } else {
-      sessionStorage.removeItem('coreoOrgCode');
+      localStorage.removeItem('coreoOrgCode');
       setNeedsOrgLogin(true);
     }
   };
@@ -1728,6 +2022,9 @@ export default function CoreoAdmin() {
           )}
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          {!isAdmin && localStorage.getItem('coreoOrgName') && (
+            <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', marginRight: '4px' }}>{localStorage.getItem('coreoOrgName')}</span>
+          )}
           <button onClick={() => window.open(`/coreo-screen/${id}`, '_blank')} className="btn-secondary" style={{ fontSize: '0.8rem' }}>Ver pantalla</button>
           {isAdmin && tournament.status === 'active' && (
             <button
@@ -1744,7 +2041,16 @@ export default function CoreoAdmin() {
             </button>
           )}
           {isAdmin && tournament.status === 'finished' && (
-            <span style={{ color: '#34d399', fontSize: '0.75rem', border: '1px solid rgba(52,211,153,0.3)', borderRadius: '20px', padding: '6px 14px' }}>Torneo finalizado</span>
+            <button
+              onClick={async () => {
+                if (!window.confirm('¿Reiniciar el torneo? Se borrarán todas las puntuaciones y datos de escena.')) return;
+                const r = await apiFetch(`${API}/tournaments/${id}/restart`, { method: 'POST' });
+                if (r.ok) { await load(); await loadTiming(); }
+              }}
+              style={{ background: 'rgba(251,146,60,0.1)', border: '1px solid rgba(251,146,60,0.4)', color: '#fb923c', fontSize: '0.78rem', padding: '6px 14px', borderRadius: '20px', cursor: 'pointer' }}
+            >
+              ↺ Reiniciar torneo
+            </button>
           )}
           <button onClick={handleLogout} style={{ background: 'none', border: '1px solid #333', color: '#666', fontSize: '0.78rem', padding: '6px 14px', borderRadius: '20px', cursor: 'pointer' }}>
             {isAdmin ? '← Torneos' : 'Salir'}
@@ -1754,18 +2060,24 @@ export default function CoreoAdmin() {
 
       {/* Tab bar */}
       <div style={{ background: '#0f0f1a', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: '2px', padding: '0 24px' }}>
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)} style={{
-            background: 'none', border: 'none', cursor: 'pointer',
-            padding: '14px 18px', fontSize: '0.82rem', letterSpacing: '0.08em',
-            display: 'inline-flex', alignItems: 'center',
-            color: activeTab === t.key ? '#7ecfff' : 'rgba(255,255,255,0.4)',
-            borderBottom: activeTab === t.key ? '2px solid #7ecfff' : '2px solid transparent',
-            transition: 'all 0.15s',
-          }}>
-            {t.label}
-          </button>
-        ))}
+        {TABS.map(t => {
+          const isActive = activeTab === t.key;
+          const color = t.accent ? '#fb923c' : '#7ecfff';
+          return (
+            <button key={t.key} onClick={() => setTab(t.key)} style={{
+              background: isActive && t.accent ? 'rgba(251,146,60,0.08)' : 'none',
+              border: 'none', cursor: 'pointer',
+              padding: '14px 18px', fontSize: '0.82rem', letterSpacing: '0.08em',
+              display: 'inline-flex', alignItems: 'center',
+              color: isActive ? color : t.accent ? 'rgba(251,146,60,0.5)' : 'rgba(255,255,255,0.4)',
+              borderBottom: isActive ? `2px solid ${color}` : '2px solid transparent',
+              transition: 'all 0.15s',
+              marginLeft: t.accent ? 'auto' : undefined,
+            }}>
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Puntuaciones tab: full-width outside the narrow container */}
@@ -1775,18 +2087,9 @@ export default function CoreoAdmin() {
         </div>
       )}
 
-      {/* Content */}
-      <div className="container" style={{ maxWidth: '960px', paddingTop: '28px', display: activeTab === 'puntuaciones' ? 'none' : undefined }}>
-        {isAdmin && tournament.status === 'setup' && activeTab !== 'en-vivo' && activeTab !== 'puntuaciones' && (
-          <SetupChecklist
-            criteria={criteria}
-            categories={parsedCategories}
-            participants={participants}
-            judges={judges}
-            onNavigate={setTab}
-          />
-        )}
-        {activeTab === 'config' && (
+      {/* Config tab: also full-width outside the narrow container */}
+      {activeTab === 'config' && (
+        <div style={{ padding: '28px 48px', maxWidth: '1400px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
           <ConfigTab
             tournamentId={Number(id)}
             criteria={criteria}
@@ -1801,6 +2104,32 @@ export default function CoreoAdmin() {
             onUpdateSpeakers={setSpeakers}
             isAdmin={isAdmin}
           />
+        </div>
+      )}
+
+      {/* En-vivo tab: full-height two-column layout, outside the narrow container */}
+      {activeTab === 'en-vivo' && (
+        <LiveTab
+          tournamentId={Number(id)}
+          participants={participants}
+          onUpdate={setParticipants}
+          timing={timing}
+          tournamentStatus={tournament.status}
+          staffThread={staffThread}
+          onStaffAdd={addToStaffThread}
+        />
+      )}
+
+      {/* Content */}
+      <div className="container" style={{ maxWidth: '960px', paddingTop: '28px', display: (activeTab === 'puntuaciones' || activeTab === 'config' || activeTab === 'en-vivo') ? 'none' : undefined }}>
+        {isAdmin && tournament.status === 'setup' && activeTab !== 'en-vivo' && activeTab !== 'puntuaciones' && (
+          <SetupChecklist
+            criteria={criteria}
+            categories={parsedCategories}
+            participants={participants}
+            judges={judges}
+            onNavigate={setTab}
+          />
         )}
         {activeTab === 'participantes' && (
           <ParticipantsTab
@@ -1812,15 +2141,6 @@ export default function CoreoAdmin() {
           />
         )}
         {activeTab === 'orden' && <OrderTab tournamentId={Number(id)} participants={participants} onUpdate={setParticipants} />}
-        {activeTab === 'en-vivo' && (
-          <LiveTab
-            tournamentId={Number(id)}
-            participants={participants}
-            onUpdate={setParticipants}
-            timing={timing}
-            tournamentStatus={tournament.status}
-          />
-        )}
       </div>
 
       <Toast msg={toast?.msg} type={toast?.type} />

@@ -40,6 +40,7 @@ function SpeakerLogin({ onLogin }) {
       if (!res.ok) { setError(data.error || 'Código no válido'); return; }
       localStorage.setItem('coreoSpeakerCode', code.trim());
       localStorage.setItem('coreoSpeakerTournamentId', data.tournament.id);
+      if (data.speaker?.name) localStorage.setItem('coreoSpeakerName', data.speaker.name);
       onLogin(data);
     } finally { setLoading(false); }
   };
@@ -132,7 +133,7 @@ function computeCategory(timingParticipants, category, round, now = Date.now()) 
 }
 
 // ── Main panel ─────────────────────────────────────────────────────────────────
-function SpeakerPanel({ tournament, participants: initialParticipants }) {
+function SpeakerPanel({ tournament, participants: initialParticipants, speakerName }) {
   const socket = useSocket();
   const [participants, setParticipants] = useState(initialParticipants);
   const [onStageId, setOnStageId] = useState(() => initialParticipants.find(p => p.on_stage)?.id ?? null);
@@ -233,7 +234,10 @@ function SpeakerPanel({ tournament, participants: initialParticipants }) {
           <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.1rem', letterSpacing: '0.25em', color: '#7ecfff' }}>ZEN TAISEN</span>
           <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: '10px', fontSize: '0.8rem' }}>{tournament.name}</span>
         </div>
-        <span style={{ color: '#fb923c', fontSize: '0.7rem', border: '1px solid rgba(251,146,60,0.4)', borderRadius: '4px', padding: '2px 8px', letterSpacing: '0.1em' }}>STAFF</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {speakerName && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem' }}>{speakerName}</span>}
+          <span style={{ color: '#fb923c', fontSize: '0.7rem', border: '1px solid rgba(251,146,60,0.4)', borderRadius: '4px', padding: '2px 8px', letterSpacing: '0.1em' }}>STAFF</span>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -399,8 +403,12 @@ function SpeakerPanel({ tournament, participants: initialParticipants }) {
 // ── Root ───────────────────────────────────────────────────────────────────────
 export default function CoreoSpeaker() {
   const [session, setSession] = useState(() => {
+    const urlCode = new URLSearchParams(window.location.search).get('code');
+    const storedCode = localStorage.getItem('coreoSpeakerCode');
+    // If the URL carries a different code, don't restore the old session
+    if (urlCode && urlCode !== storedCode) return null;
     const tid = localStorage.getItem('coreoSpeakerTournamentId');
-    const code = localStorage.getItem('coreoSpeakerCode');
+    const code = storedCode;
     return tid && code ? { tournamentId: tid, code } : null;
   });
   const [data, setData] = useState(null);
@@ -423,8 +431,9 @@ export default function CoreoSpeaker() {
   if (loading) return <div style={{ minHeight: '100vh', background: '#0a0a12', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888' }}>Cargando...</div>;
 
   if (!session || !data) {
-    return <SpeakerLogin onLogin={(d) => { setData(d); setSession({ tournamentId: d.tournament.id, code: sessionStorage.getItem('coreoSpeakerCode') }); }} />;
+    return <SpeakerLogin onLogin={(d) => { setData(d); setSession({ tournamentId: d.tournament.id, code: localStorage.getItem('coreoSpeakerCode') }); }} />;
   }
 
-  return <SpeakerPanel tournament={data.tournament} participants={data.participants} />;
+  const speakerName = data.speaker?.name || localStorage.getItem('coreoSpeakerName') || '';
+  return <SpeakerPanel tournament={data.tournament} participants={data.participants} speakerName={speakerName} />;
 }
