@@ -102,7 +102,12 @@ router.post('/tournaments', (req, res) => {
   const result = db.prepare(
     'INSERT INTO tournaments (name, type, phase_config, speaker_code, tournament_type, points_mode, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).run(name, type, defaultConfig, speakerCode, tournament_type, points_mode, initialStatus);
-  const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(result.lastInsertRowid);
+  const tid = result.lastInsertRowid;
+  if (tournament_type === 'coreografia') {
+    const staffCode = generateWordCode();
+    db.prepare('INSERT INTO coreo_speakers (tournament_id, name, access_code) VALUES (?, ?, ?)').run(tid, 'Speaker', staffCode);
+  }
+  const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tid);
   res.json(tournament);
 });
 

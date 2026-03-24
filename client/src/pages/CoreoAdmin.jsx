@@ -214,7 +214,7 @@ function SetupChecklist({ criteria, categories, participants, judges, onNavigate
 }
 
 // ── CONFIG tab (criteria + categories + rounds) ───────────────────────────────
-function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpdateTournament, judges, organizers, onUpdateJudges, onUpdateOrganizers, isAdmin }) {
+function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpdateTournament, judges, organizers, speakers, onUpdateJudges, onUpdateOrganizers, onUpdateSpeakers, isAdmin }) {
   // ── QR modal ──
   const [qrModal, setQrModal] = useState(null);
 
@@ -253,6 +253,24 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
     if (!confirm('¿Eliminar este organizador?')) return;
     await apiFetch(`${API}/organizers/${oid}`, { method: 'DELETE' });
     onUpdateOrganizers(organizers.filter(o => o.id !== oid));
+  };
+
+  // ── Speakers ──
+  const [newSpeaker, setNewSpeaker] = useState('');
+  const addSpeaker = async (e) => {
+    e.preventDefault();
+    if (!newSpeaker.trim()) return;
+    const res = await apiFetch(`${API}/tournaments/${tournamentId}/speakers`, {
+      method: 'POST', body: JSON.stringify({ name: newSpeaker.trim() }),
+    });
+    const data = await res.json();
+    setNewSpeaker('');
+    onUpdateSpeakers([...(speakers || []), data.speaker]);
+  };
+  const removeSpeaker = async (sid) => {
+    if (!confirm('¿Eliminar este speaker?')) return;
+    await apiFetch(`${API}/speakers/${sid}`, { method: 'DELETE' });
+    onUpdateSpeakers((speakers || []).filter(s => s.id !== sid));
   };
 
   // ── Poster ──
@@ -549,6 +567,34 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
           </div>
           <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(167,139,250,0.04)', borderRadius: '8px', border: '1px solid rgba(167,139,250,0.1)' }}>
             <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>El organizador accede en <strong style={{ color: '#a78bfa' }}>/coreo-organizer</strong> con su código</p>
+          </div>
+
+          {SECTION_DIVIDER}
+
+          {/* Staff */}
+          <h3 style={{ color: '#fb923c', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '0.9rem' }}>STAFF</h3>
+          <form onSubmit={addSpeaker} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+            <input placeholder="Nombre del miembro de staff" value={newSpeaker} onChange={e => setNewSpeaker(e.target.value)} style={{ flex: 1 }} />
+            <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg,#fb923c,#ea580c)', border: 'none' }}>Crear</button>
+          </form>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {(speakers || []).map(s => (
+              <div key={s.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem' }}>{s.name}</div>
+                  <div style={{ color: '#fb923c', fontSize: '0.78rem', fontFamily: 'monospace', marginTop: '3px' }}>{s.access_code}</div>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-speaker?code=${s.access_code}`, label: `STAFF · ${s.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#fb923c' }}>QR</button>
+                  <button onClick={() => window.open(`${window.location.origin}/coreo-speaker?code=${s.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.78rem', color: '#fb923c' }}>🔗</button>
+                  <button className="btn-danger" style={{ fontSize: '0.75rem', padding: '4px 10px' }} onClick={() => removeSpeaker(s.id)}>Eliminar</button>
+                </div>
+              </div>
+            ))}
+            {!(speakers || []).length && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', padding: '10px 0' }}>Sin staff.</p>}
+          </div>
+          <div style={{ marginTop: '10px', padding: '10px 14px', background: 'rgba(251,146,60,0.04)', borderRadius: '8px', border: '1px solid rgba(251,146,60,0.1)' }}>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>El staff accede en <strong style={{ color: '#fb923c' }}>/coreo-speaker</strong> con su código</p>
           </div>
         </>)}
       </div>
@@ -972,6 +1018,131 @@ function OrderTab({ tournamentId, participants, onUpdate }) {
   );
 }
 
+// ── Staff chat panel ──────────────────────────────────────────────────────────
+function SpeakerMsgPanel({ tournamentId }) {
+  const socket = useSocket();
+  const [thread, setThread] = useState([]); // { dir: 'out'|'in', from, text, type, ranking, sentAt }
+  const [msgText, setMsgText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendingRanking, setSendingRanking] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (msg) => setThread(prev => [...prev, { dir: 'in', ...msg }]);
+    socket.on('coreo:staff-msg', handler);
+    return () => socket.off('coreo:staff-msg', handler);
+  }, [socket]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [thread]);
+
+  const pushOut = (entry) => setThread(prev => [...prev, { dir: 'out', sentAt: Date.now(), ...entry }]);
+
+  const sendToStaff = async (type, payload) => {
+    const res = await apiFetch(`${API}/tournaments/${tournamentId}/speaker/send`, {
+      method: 'POST', body: JSON.stringify({ type, ...payload }),
+    });
+    if (res.ok) pushOut({ type, ...payload });
+  };
+
+  const handleSendText = async () => {
+    const text = msgText.trim();
+    if (!text) return;
+    setSending(true);
+    try { await sendToStaff('message', { text }); setMsgText(''); }
+    finally { setSending(false); }
+  };
+
+  const handleSendRanking = async () => {
+    setSendingRanking(true);
+    try {
+      const r = await apiFetch(`${API}/tournaments/${tournamentId}/scores/summary`);
+      const { criteria, participants } = await r.json();
+      const getTotal = (p) => {
+        const vals = criteria.map(c => p.criterionScores[c.id]).filter(v => v != null);
+        return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      };
+      const roundMap = {}; const roundOrder = [];
+      for (const p of participants) {
+        const round = p.round_number || 1; const cat = p.category || '—';
+        if (!roundMap[round]) { roundMap[round] = {}; roundOrder.push(round); }
+        if (!roundMap[round][cat]) roundMap[round][cat] = [];
+        roundMap[round][cat].push(p);
+      }
+      const ranking = roundOrder.map(round => ({
+        round,
+        categories: Object.keys(roundMap[round]).map(category => ({
+          category,
+          top3: [...roundMap[round][category]]
+            .sort((a, b) => { const ta = getTotal(a); const tb = getTotal(b); if (ta == null) return 1; if (tb == null) return -1; return tb - ta; })
+            .slice(0, 3).map(p => ({ name: p.name, total: getTotal(p) })),
+        })),
+      }));
+      await sendToStaff('ranking', { ranking });
+    } finally { setSendingRanking(false); }
+  };
+
+  return (
+    <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: '1px solid #1a1a2e' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <h3 style={{ color: '#fb923c', letterSpacing: '0.15em', fontSize: '0.85rem', margin: 0 }}>COMUNICACIÓN CON STAFF</h3>
+        <button
+          onClick={handleSendRanking} disabled={sendingRanking}
+          style={{ background: 'rgba(126,207,255,0.08)', border: '1px solid rgba(126,207,255,0.3)', color: '#7ecfff', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 600 }}
+        >
+          {sendingRanking ? '...' : '🏆 Enviar ranking Top 3'}
+        </button>
+      </div>
+
+      {/* Thread */}
+      <div style={{ background: '#080810', borderRadius: '10px', border: '1px solid #1a1a2e', padding: '12px', minHeight: '120px', maxHeight: '260px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+        {thread.length === 0 && (
+          <p style={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.8rem', margin: 'auto', textAlign: 'center' }}>Sin mensajes aún</p>
+        )}
+        {thread.map((m, i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: m.dir === 'out' ? 'flex-end' : 'flex-start' }}>
+            {m.dir === 'in' && (
+              <span style={{ color: '#fb923c', fontSize: '0.65rem', fontWeight: 700, marginBottom: '3px', letterSpacing: '0.08em' }}>{m.from}</span>
+            )}
+            <div style={{
+              maxWidth: '85%',
+              background: m.dir === 'out' ? 'rgba(126,207,255,0.12)' : 'rgba(251,146,60,0.1)',
+              border: `1px solid ${m.dir === 'out' ? 'rgba(126,207,255,0.25)' : 'rgba(251,146,60,0.25)'}`,
+              borderRadius: m.dir === 'out' ? '10px 10px 2px 10px' : '10px 10px 10px 2px',
+              padding: '8px 12px',
+            }}>
+              {m.type === 'ranking' ? (
+                <span style={{ color: '#7ecfff', fontSize: '0.8rem', fontWeight: 600 }}>🏆 Ranking Top 3 enviado</span>
+              ) : (
+                <span style={{ color: '#f0f0f0', fontSize: '0.88rem', lineHeight: 1.4 }}>{m.text}</span>
+              )}
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          value={msgText} onChange={e => setMsgText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendText(); } }}
+          placeholder="Mensaje al staff…"
+          style={{ flex: 1, background: '#0f0f1a', border: '1px solid #2a2a3e', borderRadius: '8px', color: '#fff', padding: '10px 14px', fontSize: '0.9rem' }}
+        />
+        <button
+          onClick={handleSendText} disabled={sending || !msgText.trim()}
+          style={{ background: 'rgba(251,146,60,0.15)', border: '1px solid rgba(251,146,60,0.4)', color: '#fb923c', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
+        >
+          {sending ? '...' : '→'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── LIVE tab ──────────────────────────────────────────────────────────────────
 function LiveTab({ tournamentId, participants, onUpdate }) {
   const [onStageId, setOnStageId] = useState(() => participants.find(p => p.on_stage)?.id ?? null);
@@ -1060,6 +1231,7 @@ function LiveTab({ tournamentId, participants, onUpdate }) {
             );
           })}
         </div>
+      <SpeakerMsgPanel tournamentId={tournamentId} />
     </div>
   );
 }
@@ -1260,6 +1432,7 @@ export default function CoreoAdmin() {
   const [participants, setParticipants] = useState([]);
   const [judges, setJudges] = useState([]);
   const [organizers, setOrganizers] = useState([]);
+  const [speakers, setSpeakers] = useState([]);
   const [tab, setTab] = useState('config');
   const [toast, setToast] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -1283,6 +1456,7 @@ export default function CoreoAdmin() {
     setParticipants(data.participants);
     setJudges(data.judges);
     setOrganizers(data.organizers || []);
+    setSpeakers(data.speakers || []);
     setNeedsOrgLogin(false);
   }, [id, navigate, isAdmin, hasOrgCode]);
 
@@ -1308,6 +1482,8 @@ export default function CoreoAdmin() {
     socket.on('coreo:judge-removed', ({ id: jid }) => setJudges(prev => prev.filter(j => j.id !== jid)));
     socket.on('coreo:organizer-added', ({ organizer }) => setOrganizers(prev => [...prev, organizer]));
     socket.on('coreo:organizer-removed', ({ id: oid }) => setOrganizers(prev => prev.filter(o => o.id !== oid)));
+    socket.on('coreo:speaker-added', ({ speaker }) => setSpeakers(prev => [...prev, speaker]));
+    socket.on('coreo:speaker-removed', ({ id: sid }) => setSpeakers(prev => prev.filter(s => s.id !== sid)));
     socket.on('coreo:on-stage', ({ participant }) => setParticipants(prev => prev.map(p => ({ ...p, on_stage: p.id === participant.id ? 1 : 0 }))));
     socket.on('coreo:off-stage', () => setParticipants(prev => prev.map(p => ({ ...p, on_stage: 0 }))));
     socket.on('coreo:poster-updated', ({ poster_path }) => setTournament(prev => prev ? { ...prev, poster_path } : prev));
@@ -1316,8 +1492,8 @@ export default function CoreoAdmin() {
       ['coreo:criteria-updated', 'coreo:config-updated', 'coreo:participant-added',
         'coreo:participant-updated', 'coreo:participant-removed', 'coreo:order-updated',
         'coreo:judge-added', 'coreo:judge-removed', 'coreo:organizer-added',
-        'coreo:organizer-removed', 'coreo:on-stage', 'coreo:off-stage',
-        'coreo:poster-updated'].forEach(e => socket.off(e));
+        'coreo:organizer-removed', 'coreo:speaker-added', 'coreo:speaker-removed',
+        'coreo:on-stage', 'coreo:off-stage', 'coreo:poster-updated'].forEach(e => socket.off(e));
     };
   }, [socket, id, load]);
 
@@ -1442,8 +1618,10 @@ export default function CoreoAdmin() {
             onUpdateTournament={updates => setTournament(prev => ({ ...prev, ...updates }))}
             judges={judges}
             organizers={organizers}
+            speakers={speakers}
             onUpdateJudges={setJudges}
             onUpdateOrganizers={setOrganizers}
+            onUpdateSpeakers={setSpeakers}
             isAdmin={isAdmin}
           />
         )}

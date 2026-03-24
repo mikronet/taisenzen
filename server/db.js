@@ -202,6 +202,17 @@ async function initDb() {
     )
   `);
 
+  // Coreography: named speakers per tournament
+  db.run(`
+    CREATE TABLE IF NOT EXISTS coreo_speakers (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      tournament_id INTEGER NOT NULL,
+      name          TEXT NOT NULL,
+      access_code   TEXT NOT NULL UNIQUE,
+      FOREIGN KEY (tournament_id) REFERENCES tournaments(id) ON DELETE CASCADE
+    )
+  `);
+
   // Migrations for existing databases
   const migrations = [
     "ALTER TABLE tournaments ADD COLUMN phase_config TEXT DEFAULT '[]'",

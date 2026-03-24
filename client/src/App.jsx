@@ -10,6 +10,7 @@ import CoreoAdmin from './pages/CoreoAdmin';
 import CoreoJudge from './pages/CoreoJudge';
 import CoreoScreen from './pages/CoreoScreen';
 import CoreoOrganizer from './pages/CoreoOrganizer';
+import CoreoSpeaker from './pages/CoreoSpeaker';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/coreo-organizer" element={<CoreoOrganizer />} />
       <Route path="/coreo-judge" element={<CoreoJudge />} />
       <Route path="/coreo-screen/:id" element={<CoreoScreen />} />
+      <Route path="/coreo-speaker" element={<CoreoSpeaker />} />
     </Routes>
   );
 }

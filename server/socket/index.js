@@ -87,6 +87,31 @@ function setupSocket(io) {
       }
     });
 
+    socket.on('join:coreo-speaker', (tournamentId) => {
+      try {
+        const tid = Number(tournamentId);
+        if (!tid || isNaN(tid)) return;
+        socket.join(`coreo-speaker:${tid}`);
+        socket.join(`screen:${tid}`); // receive coreo:on-stage / coreo:off-stage
+
+        const t = db.prepare('SELECT name FROM tournaments WHERE id = ?').get(tid);
+        socket.emit('coreo:tournament-info', { name: t?.name || '', poster_path: null });
+
+        const onStage = db.prepare(`
+          SELECT p.id, p.name, p.category, p.photo_path, p.act_order
+          FROM participants p
+          WHERE p.tournament_id = ? AND p.on_stage = 1 LIMIT 1
+        `).get(tid);
+        if (onStage) {
+          const members = db.prepare('SELECT member_name FROM participant_members WHERE participant_id = ? ORDER BY sort_order').all(onStage.id);
+          onStage.members = members.map(m => m.member_name);
+          socket.emit('coreo:on-stage', { participant: onStage });
+        }
+      } catch (err) {
+        console.error('Socket join:coreo-speaker error:', err.message);
+      }
+    });
+
     socket.on('join:admin', (tournamentId) => {
       try {
         const tid = Number(tournamentId);

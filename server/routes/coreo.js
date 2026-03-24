@@ -36,6 +36,24 @@ function requireAdmin(req, res, next) {
 }
 
 // Public endpoints (no auth)
+router.post('/speaker-login', (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Código requerido' });
+  const speaker = db.prepare(`
+    SELECT s.id, s.name, s.tournament_id, s.access_code, t.name as tournament_name
+    FROM coreo_speakers s JOIN tournaments t ON t.id = s.tournament_id
+    WHERE s.access_code = ? AND t.tournament_type = 'coreografia'
+  `).get(code.trim());
+  if (!speaker) return res.status(401).json({ error: 'Código no válido' });
+  const tournament = { id: speaker.tournament_id, name: speaker.tournament_name };
+  const participants = db.prepare(`
+    SELECT id, name, category, age_group, photo_path, act_order, on_stage, round_number
+    FROM participants WHERE tournament_id = ?
+    ORDER BY COALESCE(round_number, 1), COALESCE(act_order, 9999), id
+  `).all(tournament.id);
+  res.json({ tournament, participants });
+});
+
 router.post('/organizer-login', (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Código requerido' });
@@ -46,6 +64,22 @@ router.post('/organizer-login', (req, res) => {
   `).get(code.trim());
   if (!org) return res.status(401).json({ error: 'Código no válido' });
   res.json({ organizer: org });
+});
+
+// Staff → Organizer message (auth by x-speaker-code)
+router.post('/speaker/message', (req, res) => {
+  const code = req.headers['x-speaker-code'];
+  if (!code) return res.status(401).json({ error: 'No autorizado' });
+  const speaker = db.prepare('SELECT * FROM coreo_speakers WHERE access_code = ?').get(code);
+  if (!speaker) return res.status(401).json({ error: 'No autorizado' });
+  const { text } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'El mensaje no puede estar vacío' });
+  req.io.to(`admin:${speaker.tournament_id}`).emit('coreo:staff-msg', {
+    from: speaker.name,
+    text: text.trim(),
+    sentAt: Date.now(),
+  });
+  res.json({ ok: true });
 });
 
 router.use(requireAdmin);
@@ -69,8 +103,9 @@ router.get('/tournaments/:id', (req, res) => {
 
   const judges = db.prepare('SELECT id, name, access_code FROM judges WHERE tournament_id = ? ORDER BY id').all(tid);
   const organizers = db.prepare('SELECT id, name, access_code FROM organizers WHERE tournament_id = ? ORDER BY id').all(tid);
+  const speakers = db.prepare('SELECT id, name, access_code FROM coreo_speakers WHERE tournament_id = ? ORDER BY id').all(tid);
 
-  res.json({ tournament, criteria, participants, judges, organizers });
+  res.json({ tournament, criteria, participants, judges, organizers, speakers });
 });
 
 // ── POST /api/coreo/tournaments/:id/poster ───────────────────────────────────
@@ -330,6 +365,28 @@ router.delete('/organizers/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// ── POST /api/coreo/tournaments/:id/speakers ─────────────────────────────────
+router.post('/tournaments/:id/speakers', (req, res) => {
+  const tid = Number(req.params.id);
+  const { name } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'El nombre es obligatorio' });
+  const code = generateWordCode();
+  const result = db.prepare('INSERT INTO coreo_speakers (tournament_id, name, access_code) VALUES (?, ?, ?)').run(tid, name.trim(), code);
+  const speaker = db.prepare('SELECT * FROM coreo_speakers WHERE id = ?').get(result.lastInsertRowid);
+  req.io.to(`admin:${tid}`).emit('coreo:speaker-added', { speaker });
+  res.json({ speaker });
+});
+
+// ── DELETE /api/coreo/speakers/:id ───────────────────────────────────────────
+router.delete('/speakers/:id', (req, res) => {
+  const sid = Number(req.params.id);
+  const speaker = db.prepare('SELECT * FROM coreo_speakers WHERE id = ?').get(sid);
+  if (!speaker) return res.status(404).json({ error: 'Speaker no encontrado' });
+  db.prepare('DELETE FROM coreo_speakers WHERE id = ?').run(sid);
+  req.io.to(`admin:${speaker.tournament_id}`).emit('coreo:speaker-removed', { id: sid });
+  res.json({ success: true });
+});
+
 // ── GET /api/coreo/tournaments/:id/scores ────────────────────────────────────
 router.get('/tournaments/:id/scores', (req, res) => {
   const tid = Number(req.params.id);
@@ -394,6 +451,15 @@ router.get('/tournaments/:id/scores/summary', (req, res) => {
 
   const result = participants.map(p => ({ ...p, criterionScores: scoreMap[p.id] || {} }));
   res.json({ criteria, participants: result });
+});
+
+// Send message/ranking to speaker
+router.post('/tournaments/:id/speaker/send', requireAdmin, (req, res) => {
+  const tid = Number(req.params.id);
+  const { type, text, ranking } = req.body;
+  if (!type) return res.status(400).json({ error: 'type requerido' });
+  req.io.to(`coreo-speaker:${tid}`).emit('coreo:speaker-update', { type, text, ranking, sentAt: Date.now() });
+  res.json({ ok: true });
 });
 
 // Finish tournament (admin only)
