@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  battle-app:
+    build: .
+    container_name: battle-app
+    restart: unless-stopped
+    ports:
+      - "3080:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - ADMIN_PASSWORD=Mikron3t
+      - JWT_SECRET=gUdtiIZS4vsEP29benRJNFCxBVMHOplwLjuGhzkq
+      - SMTP_HOST=smtp.migadu.com
+      - SMTP_PORT=465
+      - SMTP_USER=yo@sergiosegura.com
+      - SMTP_PASS=Sergiet3
+      - CONTACT_TO=sergio.mikro@gmail.com

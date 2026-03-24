@@ -1,0 +1,90 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../db');
+
+// ── POST /api/coreo-judge/login ─────────────────────────────────────────────
+// Reuses the same judges table as battles
+router.post('/login', (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Código requerido' });
+  const judge = db.prepare('SELECT j.id, j.name, j.tournament_id, t.name as tournament_name, t.tournament_type FROM judges j JOIN tournaments t ON t.id = j.tournament_id WHERE j.access_code = ?').get(code.trim());
+  if (!judge) return res.status(401).json({ error: 'Código no válido' });
+  if (judge.tournament_type !== 'coreografia') return res.status(400).json({ error: 'Este código es para un torneo Battle, no Coreografía' });
+  res.json({ judge });
+});
+
+// Auth middleware for judge routes below
+function requireJudge(req, res, next) {
+  const code = req.headers['x-judge-code'];
+  if (!code) return res.status(401).json({ error: 'No autorizado' });
+  const judge = db.prepare('SELECT id, tournament_id FROM judges WHERE access_code = ?').get(code);
+  if (!judge) return res.status(401).json({ error: 'Código no válido' });
+  req.judge = judge;
+  next();
+}
+
+// ── GET /api/coreo-judge/tournament/:id/state ───────────────────────────────
+// Full state for the judge: criteria + participants (ordered) + who is on stage
+router.get('/tournament/:id/state', requireJudge, (req, res) => {
+  const tid = Number(req.params.id);
+  if (req.judge.tournament_id !== tid) return res.status(403).json({ error: 'Acceso denegado' });
+
+  const criteria = db.prepare('SELECT * FROM criteria WHERE tournament_id = ? ORDER BY sort_order').all(tid);
+
+  const participants = db.prepare(`
+    SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number
+    FROM participants WHERE tournament_id = ? ORDER BY COALESCE(act_order, 9999), id
+  `).all(tid);
+
+  res.json({ criteria, participants, judgeId: req.judge.id });
+});
+
+// ── POST /api/coreo-judge/scores ─────────────────────────────────────────────
+// Save (UPSERT) scores for one participant by this judge
+// Body: { participantId, scores: [{ criterionId, score }] }
+router.post('/scores', requireJudge, (req, res) => {
+  const { participantId, scores } = req.body;
+  if (!participantId || !Array.isArray(scores)) return res.status(400).json({ error: 'Datos inválidos' });
+
+  const participant = db.prepare('SELECT tournament_id FROM participants WHERE id = ?').get(Number(participantId));
+  if (!participant || participant.tournament_id !== req.judge.tournament_id) {
+    return res.status(403).json({ error: 'Participante no pertenece a tu torneo' });
+  }
+
+  const tid = req.judge.tournament_id;
+
+  const txn = db.transaction(() => {
+    for (const { criterionId, score } of scores) {
+      const criterion = db.prepare('SELECT id, max_score FROM criteria WHERE id = ? AND tournament_id = ?').get(Number(criterionId), tid);
+      if (!criterion) continue;
+      const clamped = Math.min(Math.max(Number(score) || 0, 0), criterion.max_score);
+      db.prepare(`
+        INSERT INTO choreography_scores (tournament_id, participant_id, judge_id, criterion_id, score)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(participant_id, judge_id, criterion_id) DO UPDATE SET score = excluded.score
+      `).run(tid, Number(participantId), req.judge.id, Number(criterionId), clamped);
+    }
+  });
+  txn();
+
+  res.json({ success: true });
+});
+
+// ── GET /api/coreo-judge/scores/:judgeId/:participantId ─────────────────────
+// Get previously saved scores for this judge + participant
+router.get('/scores/:judgeId/:participantId', requireJudge, (req, res) => {
+  const jid = Number(req.params.judgeId);
+  const pid = Number(req.params.participantId);
+
+  // Verify the judge can only read their own scores
+  if (req.judge.id !== jid) return res.status(403).json({ error: 'Acceso denegado' });
+
+  const scores = db.prepare(`
+    SELECT criterion_id, score FROM choreography_scores
+    WHERE judge_id = ? AND participant_id = ?
+  `).all(jid, pid);
+
+  res.json({ scores });
+});
+
+module.exports = router;
