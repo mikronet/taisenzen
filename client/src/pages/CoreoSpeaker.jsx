@@ -4,7 +4,7 @@ import { useSocket } from '../hooks/useSocket';
 const API = '/api/coreo';
 
 function apiFetch(url, options = {}) {
-  const code = sessionStorage.getItem('coreoSpeakerCode') || '';
+  const code = localStorage.getItem('coreoSpeakerCode') || '';
   return fetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', 'x-speaker-code': code, ...(options.headers || {}) },
@@ -38,8 +38,8 @@ function SpeakerLogin({ onLogin }) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Código no válido'); return; }
-      sessionStorage.setItem('coreoSpeakerCode', code.trim());
-      sessionStorage.setItem('coreoSpeakerTournamentId', data.tournament.id);
+      localStorage.setItem('coreoSpeakerCode', code.trim());
+      localStorage.setItem('coreoSpeakerTournamentId', data.tournament.id);
       onLogin(data);
     } finally { setLoading(false); }
   };
@@ -334,8 +334,8 @@ function SpeakerPanel({ tournament, participants: initialParticipants }) {
 // ── Root ───────────────────────────────────────────────────────────────────────
 export default function CoreoSpeaker() {
   const [session, setSession] = useState(() => {
-    const tid = sessionStorage.getItem('coreoSpeakerTournamentId');
-    const code = sessionStorage.getItem('coreoSpeakerCode');
+    const tid = localStorage.getItem('coreoSpeakerTournamentId');
+    const code = localStorage.getItem('coreoSpeakerCode');
     return tid && code ? { tournamentId: tid, code } : null;
   });
   const [data, setData] = useState(null);
@@ -351,7 +351,7 @@ export default function CoreoSpeaker() {
     })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setData(d))
-      .catch(() => { sessionStorage.removeItem('coreoSpeakerCode'); sessionStorage.removeItem('coreoSpeakerTournamentId'); setSession(null); })
+      .catch(() => { localStorage.removeItem('coreoSpeakerCode'); localStorage.removeItem('coreoSpeakerTournamentId'); setSession(null); })
       .finally(() => setLoading(false));
   }, [session]);
 
