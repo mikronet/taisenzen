@@ -1455,20 +1455,6 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
 
         <TimingWidget timing={timing} tournamentStatus={tournamentStatus} />
 
-        {/* Live on-stage timer card */}
-        {onStageP?.on_stage_at && elapsedS !== null && (
-          <div style={{ background: 'rgba(126,207,255,0.06)', border: '1px solid rgba(126,207,255,0.35)', borderRadius: '10px', padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.62rem', letterSpacing: '0.18em', marginBottom: '4px' }}>EN ESCENA AHORA</div>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: '1rem' }}>{onStageP?.name}</div>
-              <div style={{ color: categoryColor(onStageP?.category), fontSize: '0.65rem', letterSpacing: '0.1em', marginTop: '2px' }}>{onStageP?.category}</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ color: '#7ecfff', fontFamily: 'monospace', fontSize: '2rem', fontWeight: 700, lineHeight: 1 }}>{fmtTimer(elapsedS)}</div>
-            </div>
-          </div>
-        )}
-
         {/* Participant list */}
         <div>
           <h3 style={{ color: '#fb923c', letterSpacing: '0.12em', fontSize: '0.82rem', margin: '0 0 12px 0' }}>CONTROL DE ESCENA</h3>
@@ -1608,6 +1594,17 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
           style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
           title="Pantalla pública"
         />
+        {/* EN ESCENA AHORA overlay */}
+        {onStageP?.on_stage_at && elapsedS !== null && (
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)', padding: '18px 20px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.58rem', letterSpacing: '0.2em', marginBottom: '3px' }}>EN ESCENA AHORA</div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: '1rem', lineHeight: 1.2 }}>{onStageP.name}</div>
+              <div style={{ color: categoryColor(onStageP.category), fontSize: '0.65rem', letterSpacing: '0.1em', marginTop: '3px' }}>{onStageP.category}</div>
+            </div>
+            <div style={{ color: '#7ecfff', fontFamily: 'monospace', fontSize: '2.2rem', fontWeight: 700, lineHeight: 1 }}>{fmtTimer(elapsedS)}</div>
+          </div>
+        )}
       </div>
 
       <style>{`
