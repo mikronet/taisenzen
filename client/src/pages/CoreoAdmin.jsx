@@ -1312,12 +1312,7 @@ function ScoresTab({ tournamentId }) {
   if (loading) return <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '60px' }}>Cargando...</div>;
   if (!data) return null;
 
-  const { criteria, participants } = data;
-
-  const getTotal = (p) => {
-    const vals = criteria.map(c => p.criterionScores[c.id]).filter(v => v != null);
-    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-  };
+  const { criteria, judges = [], participants } = data;
 
   if (!criteria.length) return <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '60px' }}>No hay criterios configurados.</div>;
   if (!participants.length) return (
@@ -1328,7 +1323,7 @@ function ScoresTab({ tournamentId }) {
     </div>
   );
 
-  // Group by round → category (round/cat order by first act_order appearance), sort within category by total desc
+  // Group by round → category, sort within category by globalAvg desc
   const roundMap = {}; const roundOrder = [];
   for (const p of participants) {
     const r = p.round_number || 1;
@@ -1342,69 +1337,82 @@ function ScoresTab({ tournamentId }) {
     categories: Object.keys(roundMap[r]).map(cat => ({
       cat,
       participants: [...roundMap[r][cat]].sort((a, b) => {
-        const ta = getTotal(a); const tb = getTotal(b);
-        if (ta == null && tb == null) return 0;
-        if (ta == null) return 1; if (tb == null) return -1;
-        return tb - ta;
+        if (a.globalAvg == null && b.globalAvg == null) return 0;
+        if (a.globalAvg == null) return 1; if (b.globalAvg == null) return -1;
+        return b.globalAvg - a.globalAvg;
       }),
     })),
   }));
 
-  const thStyle = { textAlign: 'right', padding: '10px 14px', color: 'rgba(255,255,255,0.4)', fontWeight: 400, whiteSpace: 'nowrap', borderBottom: '1px solid #1a1a2e', fontSize: '0.8rem' };
+  const thBase = { padding: '8px 10px', color: 'rgba(255,255,255,0.4)', fontWeight: 400, whiteSpace: 'nowrap', borderBottom: '1px solid #1a1a2e', fontSize: '0.75rem' };
+  const thRight = { ...thBase, textAlign: 'right' };
+  const JUDGE_COLORS = ['#7ecfff', '#a78bfa', '#34d399', '#fb923c', '#f472b6', '#facc15'];
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
         <h2 style={{ margin: 0, fontFamily: "'Bebas Neue', sans-serif", letterSpacing: '0.15em', color: '#7ecfff', fontSize: '1.3rem' }}>
-          PUNTUACIONES <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', fontFamily: 'inherit' }}>({participants.length} grupos)</span>
+          PUNTUACIONES <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', fontFamily: 'inherit' }}>({participants.length} grupos · {judges.length} jueces)</span>
         </h2>
         <button onClick={load} style={{ background: 'none', border: '1px solid #333', color: '#888', fontSize: '0.75rem', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer' }}>↻ Actualizar</button>
       </div>
 
       {grouped.map(({ round, categories }) => (
         <div key={round} style={{ marginBottom: '36px' }}>
-          {/* Round header */}
           <div style={{ fontFamily: "'Bebas Neue', sans-serif", letterSpacing: '0.2em', color: '#7ecfff', fontSize: '1.1rem', marginBottom: '20px', paddingBottom: '8px', borderBottom: '1px solid rgba(126,207,255,0.2)' }}>
             BLOQUE {round}
           </div>
 
           {categories.map(({ cat, participants: catParts }) => (
             <div key={cat} style={{ marginBottom: '28px' }}>
-              {/* Category header */}
               <div style={{ color: categoryColor(cat), fontSize: '0.72rem', letterSpacing: '0.18em', fontWeight: 700, marginBottom: '10px', textTransform: 'uppercase' }}>
                 {cat}
               </div>
               <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a1a2e' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                   <thead>
-                    <tr style={{ background: '#0f0f1a' }}>
-                      <th style={{ ...thStyle, textAlign: 'left', color: 'rgba(255,255,255,0.3)' }}>#</th>
-                      <th style={{ ...thStyle, textAlign: 'left', color: 'rgba(255,255,255,0.4)' }}>Participante</th>
-                      {criteria.map(c => (
-                        <th key={c.id} style={thStyle}>
-                          {c.name}
-                          <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75em', marginLeft: '3px' }}>/{c.max_score}</span>
+                    {/* Row 1: judge name headers */}
+                    <tr style={{ background: '#0d0d1a' }}>
+                      <th rowSpan={2} style={{ ...thBase, textAlign: 'left', color: 'rgba(255,255,255,0.25)', minWidth: '28px' }}>#</th>
+                      <th rowSpan={2} style={{ ...thBase, textAlign: 'left', color: 'rgba(255,255,255,0.4)', minWidth: '120px' }}>Participante</th>
+                      {judges.map((j, ji) => (
+                        <th key={j.id} colSpan={criteria.length}
+                          style={{ ...thBase, textAlign: 'center', color: JUDGE_COLORS[ji % JUDGE_COLORS.length], fontWeight: 600, borderLeft: '1px solid #1a1a2e', fontSize: '0.72rem', letterSpacing: '0.1em' }}>
+                          {j.name}
                         </th>
                       ))}
-                      <th style={{ ...thStyle, color: '#7ecfff', fontWeight: 700 }}>TOTAL</th>
+                      <th rowSpan={2} style={{ ...thRight, color: '#7ecfff', fontWeight: 700, borderLeft: '2px solid rgba(126,207,255,0.2)', minWidth: '60px' }}>TOTAL</th>
+                    </tr>
+                    {/* Row 2: criteria per judge */}
+                    <tr style={{ background: '#0f0f1a' }}>
+                      {judges.map((j, ji) =>
+                        criteria.map((c, ci) => (
+                          <th key={`${j.id}-${c.id}`} style={{ ...thRight, borderLeft: ci === 0 ? '1px solid #1a1a2e' : undefined, fontSize: '0.7rem' }}>
+                            {c.name}
+                            <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.7em', marginLeft: '2px' }}>/{c.max_score}</span>
+                          </th>
+                        ))
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {catParts.map((p, idx) => {
-                      const total = getTotal(p);
+                      const total = p.globalAvg;
                       return (
                         <tr key={p.id} style={{ borderBottom: '1px solid #1a1a2e', background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
-                          <td style={{ padding: '10px 14px', color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem' }}>{idx + 1}</td>
-                          <td style={{ padding: '10px 14px', color: '#fff', fontWeight: 500 }}>{p.name}</td>
-                          {criteria.map(c => {
-                            const val = p.criterionScores[c.id];
-                            return (
-                              <td key={c.id} style={{ padding: '10px 14px', textAlign: 'right', color: val != null ? '#e2e8f0' : 'rgba(255,255,255,0.15)' }}>
-                                {val != null ? val.toFixed(2) : '—'}
-                              </td>
-                            );
-                          })}
-                          <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 700, color: total != null ? '#7ecfff' : 'rgba(255,255,255,0.15)' }}>
+                          <td style={{ padding: '10px 10px', color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem' }}>{idx + 1}</td>
+                          <td style={{ padding: '10px 10px', color: '#fff', fontWeight: 500 }}>{p.name}</td>
+                          {judges.map((j, ji) =>
+                            criteria.map((c, ci) => {
+                              const val = p.judgeScores?.[j.id]?.[c.id];
+                              return (
+                                <td key={`${j.id}-${c.id}`} style={{ padding: '10px 10px', textAlign: 'right', color: val != null ? '#e2e8f0' : 'rgba(255,255,255,0.15)', borderLeft: ci === 0 ? '1px solid #1a1a2e' : undefined }}>
+                                  {val != null ? val.toFixed(1) : '—'}
+                                </td>
+                              );
+                            })
+                          )}
+                          <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, borderLeft: '2px solid rgba(126,207,255,0.1)', color: total != null ? (p.allVoted ? '#7ecfff' : '#ef4444') : 'rgba(255,255,255,0.15)' }}>
                             {total != null ? total.toFixed(2) : '—'}
                           </td>
                         </tr>

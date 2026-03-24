@@ -175,6 +175,8 @@ function JudgePanel({ judge, onLogout }) {
   const [participantScores, setParticipantScores] = useState({}); // { pid: { criterionId: score } }
   const [onStageId, setOnStageId] = useState(null);
   const [glowing, setGlowing] = useState(false); // triggers glow burst on new on-stage event
+  const [globalScores, setGlobalScores] = useState({}); // { pid: { globalAvg, judgesVoted } }
+  const [totalJudges, setTotalJudges] = useState(0);
   const itemRefs = useRef({}); // participantId → DOM button ref
   const sidebarRef = useRef(null);
 
@@ -184,6 +186,14 @@ function JudgePanel({ judge, onLogout }) {
       el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, []);
+
+  const loadGlobalScores = useCallback(async () => {
+    const res = await apiFetch(`${API}/tournament/${judge.tournament_id}/global-scores`);
+    if (!res.ok) return;
+    const d = await res.json();
+    setTotalJudges(d.totalJudges);
+    setGlobalScores(d.participantScores || {});
+  }, [judge.tournament_id]);
 
   const load = useCallback(async () => {
     const res = await apiFetch(`${API}/tournament/${judge.tournament_id}/state`);
@@ -199,12 +209,18 @@ function JudgePanel({ judge, onLogout }) {
     }
   }, [judge.tournament_id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadGlobalScores(); }, [load, loadGlobalScores]);
 
   // Scroll to on-stage participant whenever it changes
   useEffect(() => {
     if (onStageId) scrollToParticipant(onStageId);
   }, [onStageId, scrollToParticipant]);
+
+  useEffect(() => {
+    if (!socket) return;
+    socket.on('coreo:scores-updated', loadGlobalScores);
+    return () => socket.off('coreo:scores-updated', loadGlobalScores);
+  }, [socket, loadGlobalScores]);
 
   useEffect(() => {
     if (!socket) return;
@@ -347,15 +363,21 @@ function JudgePanel({ judge, onLogout }) {
                         {p.category}{p.age_group ? ` · ${p.age_group}` : ''}
                       </div>
                       {(() => {
-                        const ps = participantScores[p.id];
-                        if (!ps || !state.criteria.length) return null;
-                        const vals = Object.values(ps);
-                        const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+                        const gs = globalScores[p.id];
                         const rank = rankMap[p.id];
+                        if (!gs && rank == null) return null;
+                        const allVoted = gs && totalJudges > 0 && gs.judgesVoted >= totalJudges;
                         return (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '3px' }}>
                             {rank != null && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem', fontWeight: 700 }}>#{rank}</span>}
-                            <span style={{ color: '#7ecfff', fontSize: '0.7rem', fontWeight: 700 }}>ø {avg.toFixed(1)}</span>
+                            {gs && (
+                              <span style={{ color: allVoted ? '#7ecfff' : '#ef4444', fontSize: '0.7rem', fontWeight: 700 }}>
+                                ø {gs.globalAvg.toFixed(1)}
+                                <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400, fontSize: '0.58rem', marginLeft: '3px' }}>
+                                  {gs.judgesVoted}/{totalJudges}
+                                </span>
+                              </span>
+                            )}
                           </div>
                         );
                       })()}
@@ -382,14 +404,29 @@ function JudgePanel({ judge, onLogout }) {
                     style={{ width: '90px', height: '90px', objectFit: 'cover', borderRadius: '10px', border: '2px solid rgba(126,207,255,0.2)', flexShrink: 0 }}
                   />
                 )}
-                <div>
+                <div style={{ flex: 1 }}>
                   {selected.id === onStageId && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
                       <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', display: 'inline-block', boxShadow: '0 0 8px #7ecfff' }} />
                       <span style={{ color: '#7ecfff', fontSize: '0.7rem', letterSpacing: '0.2em', fontWeight: 700 }}>EN ESCENA</span>
                     </div>
                   )}
-                  <h2 style={{ margin: 0, fontSize: '1.4rem', letterSpacing: '0.05em' }}>{selected.name}</h2>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                    <h2 style={{ margin: 0, fontSize: '1.4rem', letterSpacing: '0.05em' }}>{selected.name}</h2>
+                    {(() => {
+                      const ps = participantScores[selected.id];
+                      if (!ps || !state.criteria.length) return null;
+                      const vals = Object.values(ps);
+                      if (!vals.length) return null;
+                      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+                      return (
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <div style={{ color: '#7ecfff', fontSize: '1.5rem', fontWeight: 700, lineHeight: 1 }}>{avg.toFixed(1)}</div>
+                          <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem', letterSpacing: '0.1em', marginTop: '2px' }}>MI NOTA</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
                     <span style={{ color: categoryColor(selected.category), fontSize: '0.75rem', letterSpacing: '0.15em', fontWeight: 700 }}>{selected.category}</span>
                     {selected.age_group && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>{selected.age_group}</span>}

@@ -420,20 +420,20 @@ router.get('/tournaments/:id/scores/detail', (req, res) => {
 });
 
 // ── GET /api/coreo/tournaments/:id/scores/summary ────────────────────────────
-// Per-participant per-criterion average scores (across all judges)
+// Per-participant per-judge per-criterion scores + global avg + allVoted flag
 router.get('/tournaments/:id/scores/summary', (req, res) => {
   const tid = Number(req.params.id);
 
   const criteria = db.prepare('SELECT * FROM criteria WHERE tournament_id = ? ORDER BY sort_order').all(tid);
+  const judges = db.prepare('SELECT id, name FROM judges WHERE tournament_id = ? ORDER BY id').all(tid);
 
   const scores = db.prepare(`
-    SELECT cs.participant_id, cs.criterion_id, AVG(cs.score) as avg_score
+    SELECT cs.participant_id, cs.judge_id, cs.criterion_id, cs.score
     FROM choreography_scores cs
     WHERE cs.tournament_id = ?
-    GROUP BY cs.participant_id, cs.criterion_id
   `).all(tid);
 
-  if (!scores.length) return res.json({ criteria, participants: [] });
+  if (!scores.length) return res.json({ criteria, judges, participants: [] });
 
   const participantIds = [...new Set(scores.map(s => s.participant_id))];
   const placeholders = participantIds.map(() => '?').join(',');
@@ -443,14 +443,24 @@ router.get('/tournaments/:id/scores/summary', (req, res) => {
     ORDER BY COALESCE(act_order, 9999), id
   `).all(...participantIds);
 
-  const scoreMap = {};
+  // Build { participantId: { judgeId: { criterionId: score } } }
+  const judgeScoreMap = {};
   for (const s of scores) {
-    if (!scoreMap[s.participant_id]) scoreMap[s.participant_id] = {};
-    scoreMap[s.participant_id][s.criterion_id] = s.avg_score;
+    if (!judgeScoreMap[s.participant_id]) judgeScoreMap[s.participant_id] = {};
+    if (!judgeScoreMap[s.participant_id][s.judge_id]) judgeScoreMap[s.participant_id][s.judge_id] = {};
+    judgeScoreMap[s.participant_id][s.judge_id][s.criterion_id] = s.score;
   }
 
-  const result = participants.map(p => ({ ...p, criterionScores: scoreMap[p.id] || {} }));
-  res.json({ criteria, participants: result });
+  const result = participants.map(p => {
+    const jScores = judgeScoreMap[p.id] || {};
+    const judgesVoted = Object.keys(jScores).length;
+    const allVoted = judges.length > 0 && judgesVoted >= judges.length;
+    const allVals = Object.values(jScores).flatMap(cMap => Object.values(cMap));
+    const globalAvg = allVals.length ? allVals.reduce((a, b) => a + b, 0) / allVals.length : null;
+    return { ...p, judgeScores: jScores, allVoted, globalAvg, judgesVoted };
+  });
+
+  res.json({ criteria, judges, participants: result });
 });
 
 // Send message/ranking to speaker

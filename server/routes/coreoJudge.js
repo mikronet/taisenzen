@@ -71,6 +71,29 @@ router.post('/scores', requireJudge, (req, res) => {
   res.json({ success: true });
 });
 
+// ── GET /api/coreo-judge/tournament/:id/global-scores ───────────────────────
+// Per-participant global avg across all judges + judges voted count (for sidebar colour)
+router.get('/tournament/:id/global-scores', requireJudge, (req, res) => {
+  const tid = Number(req.params.id);
+  if (req.judge.tournament_id !== tid) return res.status(403).json({ error: 'Acceso denegado' });
+
+  const totalJudges = db.prepare('SELECT COUNT(*) as n FROM judges WHERE tournament_id = ?').get(tid).n;
+  const rows = db.prepare(`
+    SELECT participant_id,
+           COUNT(DISTINCT judge_id) as judges_voted,
+           AVG(score)               as global_avg
+    FROM choreography_scores
+    WHERE tournament_id = ?
+    GROUP BY participant_id
+  `).all(tid);
+
+  const participantScores = {};
+  for (const r of rows) {
+    participantScores[r.participant_id] = { globalAvg: r.global_avg, judgesVoted: r.judges_voted };
+  }
+  res.json({ totalJudges, participantScores });
+});
+
 // ── GET /api/coreo-judge/scores/:judgeId/:participantId ─────────────────────
 // Get previously saved scores for this judge + participant
 router.get('/scores/:judgeId/:participantId', requireJudge, (req, res) => {
