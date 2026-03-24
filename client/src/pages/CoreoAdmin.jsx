@@ -1777,7 +1777,7 @@ export default function CoreoAdmin() {
 
       {/* Content */}
       <div className="container" style={{ maxWidth: '960px', paddingTop: '28px', display: activeTab === 'puntuaciones' ? 'none' : undefined }}>
-        {isAdmin && activeTab !== 'en-vivo' && activeTab !== 'puntuaciones' && (
+        {isAdmin && tournament.status === 'setup' && activeTab !== 'en-vivo' && activeTab !== 'puntuaciones' && (
           <SetupChecklist
             criteria={criteria}
             categories={parsedCategories}
