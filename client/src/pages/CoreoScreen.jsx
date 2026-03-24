@@ -96,7 +96,7 @@ export default function CoreoScreen() {
 
       <ParticleCanvas />
 
-      {/* TAISEN ZEN watermark — top left */}
+      {/* ZEN TAISEN watermark — top left */}
       <div style={{
         position: 'fixed', top: '24px', left: '32px', zIndex: 2,
         display: 'flex', alignItems: 'baseline', gap: '6px',
@@ -107,7 +107,7 @@ export default function CoreoScreen() {
           letterSpacing: '0.25em',
           color: 'rgba(126,207,255,0.5)',
           lineHeight: 1,
-        }}>TAISEN ZEN</span>
+        }}>ZEN TAISEN</span>
       </div>
 
       {!onStage ? (

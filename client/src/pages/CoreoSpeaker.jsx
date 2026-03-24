@@ -47,7 +47,7 @@ function SpeakerLogin({ onLogin }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a12' }}>
       <form onSubmit={handleSubmit} className="card" style={{ width: '100%', maxWidth: '380px' }}>
-        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>TAISEN ZEN</p>
+        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>ZEN TAISEN</p>
         <h2 style={{ marginBottom: '8px', color: '#fb923c', fontSize: '0.85rem', letterSpacing: '0.2em' }}>STAFF — COREOGRAFÍA</h2>
         <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Introduce tu código de acceso</p>
         <input
@@ -187,7 +187,7 @@ function SpeakerPanel({ tournament, participants: initialParticipants }) {
       {/* Header */}
       <div style={{ background: '#111', borderBottom: '1px solid #1a1a2e', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div>
-          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.1rem', letterSpacing: '0.25em', color: '#7ecfff' }}>TAISEN ZEN</span>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.1rem', letterSpacing: '0.25em', color: '#7ecfff' }}>ZEN TAISEN</span>
           <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: '10px', fontSize: '0.8rem' }}>{tournament.name}</span>
         </div>
         <span style={{ color: '#fb923c', fontSize: '0.7rem', border: '1px solid rgba(251,146,60,0.4)', borderRadius: '4px', padding: '2px 8px', letterSpacing: '0.1em' }}>STAFF</span>

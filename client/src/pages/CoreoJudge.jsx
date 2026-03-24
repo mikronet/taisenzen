@@ -48,7 +48,7 @@ function JudgeLogin({ onLogin }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a12' }}>
       <form onSubmit={handleSubmit} className="card" style={{ width: '100%', maxWidth: '380px' }}>
-        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>TAISEN ZEN</p>
+        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>ZEN TAISEN</p>
         <h2 style={{ marginBottom: '20px', color: '#7ecfff', fontSize: '0.85rem', letterSpacing: '0.2em' }}>JUEZ — COREOGRAFÍA</h2>
         <input
           type="text" placeholder="Código de acceso"
@@ -246,7 +246,7 @@ function JudgePanel({ judge, onLogout }) {
       {/* Header */}
       <div style={{ background: '#111', borderBottom: '1px solid #1a1a2e', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.2rem', letterSpacing: '0.2em', color: '#7ecfff' }}>TAISEN ZEN</span>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.2rem', letterSpacing: '0.2em', color: '#7ecfff' }}>ZEN TAISEN</span>
           <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: '12px', fontSize: '0.8rem' }}>JUEZ: {judge.name}</span>
         </div>
         <button onClick={onLogout} style={{ background: 'none', border: '1px solid #333', color: '#666', fontSize: '0.75rem', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer' }}>Salir</button>
