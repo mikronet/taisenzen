@@ -1570,10 +1570,16 @@ export default function CoreoAdmin() {
           <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.3rem', letterSpacing: '0.25em', color: '#7ecfff' }}>ZEN TAISEN</span>
           <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: '12px', fontSize: '0.85rem' }}>{tournament.name}</span>
           <span style={{ marginLeft: '8px', fontSize: '0.7rem', color: '#7ecfff', border: '1px solid rgba(126,207,255,0.3)', borderRadius: '4px', padding: '2px 8px', letterSpacing: '0.1em' }}>COREO</span>
+          {tournament.status === 'setup' && (
+            <span style={{ marginLeft: '4px', fontSize: '0.65rem', color: '#fb923c', border: '1px solid rgba(251,146,60,0.4)', borderRadius: '4px', padding: '2px 8px', letterSpacing: '0.1em' }}>PREPARACIÓN</span>
+          )}
+          {tournament.status === 'active' && (
+            <span style={{ marginLeft: '4px', fontSize: '0.65rem', color: '#34d399', border: '1px solid rgba(52,211,153,0.3)', borderRadius: '4px', padding: '2px 8px', letterSpacing: '0.1em' }}>ACTIVO</span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <button onClick={() => window.open(`/coreo-screen/${id}`, '_blank')} className="btn-secondary" style={{ fontSize: '0.8rem' }}>Ver pantalla</button>
-          {isAdmin && tournament.status !== 'finished' && (
+          {isAdmin && tournament.status === 'active' && (
             <button
               onClick={async () => {
                 if (!window.confirm('¿Finalizar el torneo? Esta acción no se puede deshacer.')) return;

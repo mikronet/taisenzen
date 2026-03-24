@@ -331,15 +331,22 @@ export default function Home() {
                   animation: `card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) ${0.9 + idx * 0.1}s forwards`,
                 }}>
                   <div style={{ textAlign: 'left' }}>
-                    {/* EN VIVO pulsing indicator */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-                      <div style={{
-                        width: '7px', height: '7px', borderRadius: '50%',
-                        background: '#e94560',
-                        animation: 'pulse-dot 1.4s ease-in-out infinite',
-                      }} />
-                      <span style={{ color: '#e94560', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.15em' }}>EN VIVO</span>
-                    </div>
+                    {/* Status indicator */}
+                    {t.status === 'setup' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#fb923c' }} />
+                        <span style={{ color: '#fb923c', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.15em' }}>PREPARACIÓN</span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
+                        <div style={{
+                          width: '7px', height: '7px', borderRadius: '50%',
+                          background: '#e94560',
+                          animation: 'pulse-dot 1.4s ease-in-out infinite',
+                        }} />
+                        <span style={{ color: '#e94560', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.15em' }}>EN VIVO</span>
+                      </div>
+                    )}
                     <span style={{ fontWeight: 600, fontSize: '1rem', color: '#f0f0f0' }}>{t.name}</span>
                     <span style={{ color: '#666', fontSize: '0.8rem', marginLeft: '10px' }}>
                       {t.tournament_type === 'coreografia' ? 'Coreografía' : t.type}

@@ -293,6 +293,8 @@ router.post('/participants/:id/on-stage', (req, res) => {
   const txn = db.transaction(() => {
     db.prepare('UPDATE participants SET on_stage = 0 WHERE tournament_id = ?').run(tid);
     db.prepare('UPDATE participants SET on_stage = 1 WHERE id = ?').run(pid);
+    // First time a participant goes on-stage: transition tournament from setup → active
+    db.prepare("UPDATE tournaments SET status = 'active' WHERE id = ? AND status = 'setup'").run(tid);
   });
   txn();
 

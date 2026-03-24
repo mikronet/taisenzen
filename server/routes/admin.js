@@ -98,7 +98,7 @@ router.post('/tournaments', (req, res) => {
   }
   const speakerCode = generateWordCode();
   const defaultConfig = JSON.stringify(['Filtros', 'Cuartos', 'Semifinal', 'Final']);
-  const initialStatus = tournament_type === 'coreografia' ? 'active' : 'setup';
+  const initialStatus = 'setup'; // coreo transitions to 'active' when first participant goes on-stage
   const result = db.prepare(
     'INSERT INTO tournaments (name, type, phase_config, speaker_code, tournament_type, points_mode, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).run(name, type, defaultConfig, speakerCode, tournament_type, points_mode, initialStatus);
