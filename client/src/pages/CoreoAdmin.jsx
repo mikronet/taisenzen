@@ -1606,8 +1606,15 @@ export default function CoreoAdmin() {
         ))}
       </div>
 
+      {/* Puntuaciones tab: full-width outside the narrow container */}
+      {activeTab === 'puntuaciones' && (
+        <div style={{ padding: '28px 32px' }}>
+          <ScoresTab tournamentId={Number(id)} />
+        </div>
+      )}
+
       {/* Content */}
-      <div className="container" style={{ maxWidth: '960px', paddingTop: '28px' }}>
+      <div className="container" style={{ maxWidth: '960px', paddingTop: '28px', display: activeTab === 'puntuaciones' ? 'none' : undefined }}>
         {isAdmin && activeTab !== 'en-vivo' && activeTab !== 'puntuaciones' && (
           <SetupChecklist
             criteria={criteria}
@@ -1643,7 +1650,6 @@ export default function CoreoAdmin() {
           />
         )}
         {activeTab === 'orden' && <OrderTab tournamentId={Number(id)} participants={participants} onUpdate={setParticipants} />}
-        {activeTab === 'puntuaciones' && <ScoresTab tournamentId={Number(id)} />}
         {activeTab === 'en-vivo' && (
           <LiveTab
             tournamentId={Number(id)}
