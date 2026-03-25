@@ -9,7 +9,6 @@ router.get('/active', (req, res) => {
     FROM tournaments t
     LEFT JOIN phases p ON p.tournament_id = t.id AND p.status = 'active'
     WHERE t.status = 'active'
-       OR (t.status = 'setup' AND t.tournament_type = 'coreografia')
     ORDER BY t.created_at DESC
   `).all();
   res.json(tournaments);

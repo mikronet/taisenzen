@@ -14,7 +14,7 @@ function categoryColor(cat) {
 }
 
 function apiFetch(url, options = {}) {
-  const code = localStorage.getItem('coreoJudgeCode') || '';
+  const code = sessionStorage.getItem('coreoJudgeCode') || '';
   return fetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', 'x-judge-code': code, ...(options.headers || {}) },
@@ -38,9 +38,9 @@ function JudgeLogin({ onLogin }) {
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || 'Error'); return; }
-      localStorage.setItem('coreoJudgeCode', code.trim());
-      localStorage.setItem('coreoJudgeId', data.judge.id);
-      localStorage.setItem('coreoJudgeTournamentId', data.judge.tournament_id);
+      sessionStorage.setItem('coreoJudgeCode', code.trim());
+      sessionStorage.setItem('coreoJudgeId', data.judge.id);
+      sessionStorage.setItem('coreoJudgeTournamentId', data.judge.tournament_id);
       onLogin(data.judge);
     } finally { setLoading(false); }
   };
@@ -197,6 +197,7 @@ function JudgePanel({ judge, onLogout }) {
   const [glowing, setGlowing] = useState(false); // triggers glow burst on new on-stage event
   const [globalScores, setGlobalScores] = useState({}); // { pid: { globalAvg, judgesVoted } }
   const [totalJudges, setTotalJudges] = useState(0);
+  const [sidebarCatCollapsed, setSidebarCatCollapsed] = useState({});
   const itemRefs = useRef({}); // participantId → DOM button ref
   const sidebarRef = useRef(null);
 
@@ -241,6 +242,20 @@ function JudgePanel({ judge, onLogout }) {
   useEffect(() => {
     if (onStageId) scrollToParticipant(onStageId);
   }, [onStageId, scrollToParticipant]);
+
+  // Auto-collapse sidebar categories: expand only the one containing the on-stage participant
+  useEffect(() => {
+    if (!state || !onStageId) return;
+    const onStageP = state.participants.find(p => p.id === onStageId);
+    if (!onStageP) return;
+    const activeKey = `${onStageP.round_number || 1}:${onStageP.category || '—'}`;
+    const newCollapsed = {};
+    for (const p of state.participants) {
+      const key = `${p.round_number || 1}:${p.category || '—'}`;
+      if (!(key in newCollapsed)) newCollapsed[key] = key !== activeKey;
+    }
+    setSidebarCatCollapsed(newCollapsed);
+  }, [onStageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!socket) return;
@@ -336,8 +351,10 @@ function JudgePanel({ judge, onLogout }) {
             const roundMap = {}; const roundOrder = [];
             for (const p of sorted) {
               const r = p.round_number || 1;
-              if (!roundMap[r]) { roundMap[r] = []; roundOrder.push(r); }
-              roundMap[r].push(p);
+              const cat = p.category || '—';
+              if (!roundMap[r]) { roundMap[r] = { catMap: {}, catOrder: [] }; roundOrder.push(r); }
+              if (!roundMap[r].catMap[cat]) { roundMap[r].catMap[cat] = []; roundMap[r].catOrder.push(cat); }
+              roundMap[r].catMap[cat].push(p);
             }
             let counter = 0;
             return roundOrder.map(r => (
@@ -345,83 +362,101 @@ function JudgePanel({ judge, onLogout }) {
                 <div style={{ padding: '6px 12px', fontSize: '0.65rem', letterSpacing: '0.18em', color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", background: 'rgba(126,207,255,0.05)', borderBottom: '1px solid #1a1a2e' }}>
                   BLOQUE {r}
                 </div>
-                {roundMap[r].map(p => {
-                  counter++;
-                  const pos = counter;
-                  const isSelected = p.id === selectedId;
-                  const isSaved = savedIds.has(p.id);
-                  const isOnStage = p.id === onStageId;
+                {roundMap[r].catOrder.map(cat => {
+                  const cKey = `${r}:${cat}`;
+                  const catCollapsed = !!sidebarCatCollapsed[cKey];
+                  const catParts = roundMap[r].catMap[cat];
+                  const hasCatOnStage = catParts.some(p => p.id === onStageId);
                   return (
-                    <button
-                      key={p.id}
-                      ref={el => { itemRefs.current[p.id] = el; }}
-                      onClick={() => setSelectedId(p.id)}
-                      style={{
-                        width: '100%', padding: '12px', textAlign: 'left',
-                        background: isOnStage
-                          ? 'rgba(126,207,255,0.1)'
-                          : isSelected ? 'rgba(126,207,255,0.05)' : 'none',
-                        border: 'none', borderBottom: '1px solid #1a1a2e', cursor: 'pointer',
-                        borderLeft: isOnStage
-                          ? '3px solid #7ecfff'
-                          : isSelected ? '3px solid rgba(126,207,255,0.4)' : '3px solid transparent',
-                        transition: 'background 0.2s, box-shadow 0.3s',
-                        boxShadow: isOnStage && glowing
-                          ? 'inset 0 0 18px rgba(126,207,255,0.18), inset 3px 0 12px rgba(126,207,255,0.3)'
-                          : 'none',
-                        animation: isOnStage && glowing ? 'sidebarGlow 2.5s ease-out forwards' : 'none',
-                        position: 'relative',
-                      }}
-                    >
-                      {isOnStage && (
-                        <span style={{
-                          position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px',
-                          background: '#7ecfff',
-                          boxShadow: '0 0 8px #7ecfff, 0 0 16px #7ecfff',
-                          animation: glowing ? 'glowBar 2.5s ease-out forwards' : 'none',
-                        }} />
-                      )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ color: isOnStage ? 'rgba(126,207,255,0.6)' : 'rgba(255,255,255,0.3)', fontSize: '0.7rem' }}>{pos}.</span>
-                        {isOnStage && (
-                          <span style={{
-                            width: '7px', height: '7px', borderRadius: '50%',
-                            background: '#7ecfff', display: 'inline-block', flexShrink: 0,
-                            boxShadow: '0 0 6px #7ecfff, 0 0 12px #7ecfff',
-                            animation: 'dotPulse 1.5s ease-in-out infinite',
-                          }} />
-                        )}
-                        {isSaved && <span style={{ color: '#34d399', fontSize: '0.65rem' }}>✓</span>}
+                    <div key={cat}>
+                      <div
+                        onClick={() => setSidebarCatCollapsed(prev => ({ ...prev, [cKey]: !prev[cKey] }))}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', cursor: 'pointer', userSelect: 'none', background: hasCatOnStage ? 'rgba(126,207,255,0.04)' : 'none', borderBottom: '1px solid #1a1a2e' }}
+                      >
+                        <span style={{ color: categoryColor(cat), fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', flex: 1 }}>{cat === '—' ? 'Sin categoría' : cat}</span>
+                        {hasCatOnStage && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#7ecfff', boxShadow: '0 0 5px #7ecfff', display: 'inline-block', animation: 'dotPulse 1.5s ease-in-out infinite' }} />}
+                        <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.6rem' }}>{catCollapsed ? '▶' : '▼'}</span>
                       </div>
-                      <div style={{
-                        color: isOnStage ? '#fff' : isSelected ? '#fff' : 'rgba(255,255,255,0.65)',
-                        fontSize: '0.85rem', marginTop: '2px', lineHeight: 1.3,
-                        fontWeight: isOnStage ? 700 : 400,
-                        textShadow: isOnStage && glowing ? '0 0 8px rgba(126,207,255,0.5)' : 'none',
-                      }}>{p.name}</div>
-                      <div style={{ color: categoryColor(p.category), fontSize: '0.65rem', letterSpacing: '0.1em', marginTop: '3px' }}>
-                        {p.category}{p.age_group ? ` · ${p.age_group}` : ''}
-                      </div>
-                      {(() => {
-                        const gs = globalScores[p.id];
-                        const rank = rankMap[p.id];
-                        if (!gs && rank == null) return null;
-                        const allVoted = gs && totalJudges > 0 && gs.judgesVoted >= totalJudges;
+                      {!catCollapsed && catParts.map(p => {
+                        counter++;
+                        const pos = counter;
+                        const isSelected = p.id === selectedId;
+                        const isSaved = savedIds.has(p.id);
+                        const isOnStage = p.id === onStageId;
                         return (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '3px' }}>
-                            {rank != null && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem', fontWeight: 700 }}>#{rank}</span>}
-                            {gs && (
-                              <span style={{ color: allVoted ? '#7ecfff' : '#ef4444', fontSize: '0.7rem', fontWeight: 700 }}>
-                                ø {gs.globalAvg.toFixed(1)}
-                                <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400, fontSize: '0.58rem', marginLeft: '3px' }}>
-                                  {gs.judgesVoted}/{totalJudges}
-                                </span>
-                              </span>
+                          <button
+                            key={p.id}
+                            ref={el => { itemRefs.current[p.id] = el; }}
+                            onClick={() => setSelectedId(p.id)}
+                            style={{
+                              width: '100%', padding: '10px 12px', textAlign: 'left',
+                              background: isOnStage
+                                ? 'rgba(126,207,255,0.1)'
+                                : isSelected ? 'rgba(126,207,255,0.05)' : 'none',
+                              border: 'none', borderBottom: '1px solid #1a1a2e', cursor: 'pointer',
+                              borderLeft: isOnStage
+                                ? '3px solid #7ecfff'
+                                : isSelected ? '3px solid rgba(126,207,255,0.4)' : '3px solid transparent',
+                              transition: 'background 0.2s, box-shadow 0.3s',
+                              boxShadow: isOnStage && glowing
+                                ? 'inset 0 0 18px rgba(126,207,255,0.18), inset 3px 0 12px rgba(126,207,255,0.3)'
+                                : 'none',
+                              animation: isOnStage && glowing ? 'sidebarGlow 2.5s ease-out forwards' : 'none',
+                              position: 'relative',
+                            }}
+                          >
+                            {isOnStage && (
+                              <span style={{
+                                position: 'absolute', left: 0, top: 0, bottom: 0, width: '3px',
+                                background: '#7ecfff',
+                                boxShadow: '0 0 8px #7ecfff, 0 0 16px #7ecfff',
+                                animation: glowing ? 'glowBar 2.5s ease-out forwards' : 'none',
+                              }} />
                             )}
-                          </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                              <span style={{ color: isOnStage ? 'rgba(126,207,255,0.6)' : 'rgba(255,255,255,0.3)', fontSize: '0.7rem' }}>{pos}.</span>
+                              {isOnStage && (
+                                <span style={{
+                                  width: '7px', height: '7px', borderRadius: '50%',
+                                  background: '#7ecfff', display: 'inline-block', flexShrink: 0,
+                                  boxShadow: '0 0 6px #7ecfff, 0 0 12px #7ecfff',
+                                  animation: 'dotPulse 1.5s ease-in-out infinite',
+                                }} />
+                              )}
+                              {isSaved && <span style={{ color: '#34d399', fontSize: '0.65rem' }}>✓</span>}
+                            </div>
+                            <div style={{
+                              color: isOnStage ? '#fff' : isSelected ? '#fff' : 'rgba(255,255,255,0.65)',
+                              fontSize: '0.85rem', marginTop: '2px', lineHeight: 1.3,
+                              fontWeight: isOnStage ? 700 : 400,
+                              textShadow: isOnStage && glowing ? '0 0 8px rgba(126,207,255,0.5)' : 'none',
+                            }}>{p.name}</div>
+                            {p.age_group && (
+                              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', marginTop: '2px' }}>{p.age_group}</div>
+                            )}
+                            {(() => {
+                              const gs = globalScores[p.id];
+                              const rank = rankMap[p.id];
+                              if (!gs && rank == null) return null;
+                              const allVoted = gs && totalJudges > 0 && gs.judgesVoted >= totalJudges;
+                              return (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '3px' }}>
+                                  {rank != null && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.65rem', fontWeight: 700 }}>#{rank}</span>}
+                                  {gs && (
+                                    <span style={{ color: allVoted ? '#7ecfff' : '#ef4444', fontSize: '0.7rem', fontWeight: 700 }}>
+                                      ø {gs.globalAvg.toFixed(1)}
+                                      <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400, fontSize: '0.58rem', marginLeft: '3px' }}>
+                                        {gs.judgesVoted}/{totalJudges}
+                                      </span>
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </button>
                         );
-                      })()}
-                    </button>
+                      })}
+                    </div>
                   );
                 })}
               </div>
@@ -439,15 +474,15 @@ function JudgePanel({ judge, onLogout }) {
           ) : (
             <div style={{ maxWidth: '560px', margin: '0 auto' }}>
               {/* Participant card */}
-              <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '28px' }}>
+              <div style={{ marginBottom: '28px' }}>
                 {selected.photo_path && (
                   <img
                     src={`/uploads/${selected.photo_path}`}
                     alt={selected.name}
-                    style={{ width: '90px', height: '90px', objectFit: 'cover', borderRadius: '10px', border: '2px solid rgba(126,207,255,0.2)', flexShrink: 0 }}
+                    style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '10px', border: '2px solid rgba(126,207,255,0.2)', display: 'block', marginBottom: '14px' }}
                   />
                 )}
-                <div style={{ flex: 1 }}>
+                <div>
                   {selected.id === onStageId && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
                       <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', display: 'inline-block', boxShadow: '0 0 8px #7ecfff', animation: 'dotPulse 1.5s ease-in-out infinite' }} />
@@ -537,24 +572,24 @@ export default function CoreoJudge() {
     // If the URL carries a ?code= that differs from the stored one, don't restore the old session
     // (multiple judges can open their own link in the same browser without interfering)
     const urlCode = new URLSearchParams(window.location.search).get('code');
-    const storedCode = localStorage.getItem('coreoJudgeCode');
+    const storedCode = sessionStorage.getItem('coreoJudgeCode');
     if (urlCode && urlCode !== storedCode) return null;
 
-    const id = localStorage.getItem('coreoJudgeId');
-    const tid = localStorage.getItem('coreoJudgeTournamentId');
+    const id = sessionStorage.getItem('coreoJudgeId');
+    const tid = sessionStorage.getItem('coreoJudgeTournamentId');
     const code = storedCode;
-    const name = localStorage.getItem('coreoJudgeName');
+    const name = sessionStorage.getItem('coreoJudgeName');
     if (id && tid && code) return { id: Number(id), tournament_id: Number(tid), name: name || 'Juez' };
     return null;
   });
 
   const handleLogin = (j) => {
-    localStorage.setItem('coreoJudgeName', j.name);
+    sessionStorage.setItem('coreoJudgeName', j.name);
     setJudge(j);
   };
 
   const handleLogout = () => {
-    ['coreoJudgeCode', 'coreoJudgeId', 'coreoJudgeTournamentId', 'coreoJudgeName'].forEach(k => localStorage.removeItem(k));
+    ['coreoJudgeCode', 'coreoJudgeId', 'coreoJudgeTournamentId', 'coreoJudgeName'].forEach(k => sessionStorage.removeItem(k));
     setJudge(null);
   };
 

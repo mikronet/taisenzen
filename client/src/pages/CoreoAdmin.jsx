@@ -1103,7 +1103,7 @@ function SpeakerMsgPanel({ tournamentId, thread, onAdd }) {
 // ── LIVE tab ──────────────────────────────────────────────────────────────────
 // ── Timing helpers ────────────────────────────────────────────────────────────
 function fmtElapsed(startedAt, now = Date.now()) {
-  if (!startedAt) return '00:00:00';
+  if (startedAt == null) return '00:00:00';
   const total = Math.max(0, Math.floor((now - startedAt) / 1000));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
@@ -1203,12 +1203,12 @@ function TimingWidget({ timing, tournamentStatus }) {
   useEffect(() => {
     const active = timing?.participants?.find(p => p.on_stage_at);
     if (!active) return;
-    const nowMs = Date.now();
+    const ref = active.on_stage_at; // use actual start time so elapsed is correct on page reload
     const bKey = String(active.round_number || 1);
     const cKey = `${active.round_number || 1}:${active.category || '—'}`;
-    setTourTimer(prev => prev?.running ? prev : { running: true, startMs: nowMs - (prev?.pausedMs ?? 0), pausedMs: 0 });
-    setBlockTimers(prev => prev[bKey]?.running ? prev : { ...prev, [bKey]: { running: true, startMs: nowMs - (prev[bKey]?.pausedMs ?? 0), pausedMs: 0 } });
-    setCatTimers(prev => prev[cKey]?.running ? prev : { ...prev, [cKey]: { running: true, startMs: nowMs - (prev[cKey]?.pausedMs ?? 0), pausedMs: 0 } });
+    setTourTimer(prev => prev?.running ? prev : { running: true, startMs: ref - (prev?.pausedMs ?? 0), pausedMs: 0 });
+    setBlockTimers(prev => prev[bKey]?.running ? prev : { ...prev, [bKey]: { running: true, startMs: ref - (prev[bKey]?.pausedMs ?? 0), pausedMs: 0 } });
+    setCatTimers(prev => prev[cKey]?.running ? prev : { ...prev, [cKey]: { running: true, startMs: ref - (prev[cKey]?.pausedMs ?? 0), pausedMs: 0 } });
   }, [timing?.participants]);
 
   if (!timing?.started_at) return null;
@@ -1312,7 +1312,7 @@ function TimingWidget({ timing, tournamentStatus }) {
   );
 }
 
-function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd }) {
+function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd, scoresRefreshTick }) {
   const [loading, setLoading] = useState(null);
   const [nowMs, setNowMs] = useState(Date.now());
   // Local participant state (augments parent state with real-time timer fields)
@@ -1337,29 +1337,12 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
     setAllVotedMap(map);
   }, [tournamentId]);
 
-  useEffect(() => { loadVotes(); }, [loadVotes]);
+  useEffect(() => { loadVotes(); }, [loadVotes, scoresRefreshTick]);
 
   useEffect(() => {
     const iv = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(iv);
   }, []);
-
-  const socket = useSocket();
-  useEffect(() => {
-    if (!socket) return;
-    socket.on('coreo:timer-started', ({ participantId, on_stage_at }) => {
-      setLocalParts(prev => prev.map(p => p.id === participantId ? { ...p, on_stage_at } : p));
-    });
-    socket.on('coreo:timer-stopped', ({ participantId, on_stage_duration_s }) => {
-      setLocalParts(prev => prev.map(p => p.id === participantId ? { ...p, on_stage_at: null, on_stage_duration_s } : p));
-    });
-    socket.on('coreo:scores-updated', loadVotes);
-    return () => {
-      socket.off('coreo:timer-started');
-      socket.off('coreo:timer-stopped');
-      socket.off('coreo:scores-updated', loadVotes);
-    };
-  }, [socket, loadVotes]);
 
   const fmtTimer = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
 
@@ -1395,6 +1378,18 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
   const allSorted = rounds.flatMap(r => r.categories.flatMap(c => c.participants));
   const partIdxMap = Object.fromEntries(allSorted.map((p, i) => [p.id, i + 1]));
   const onStageP = localParts.find(p => p.on_stage);
+
+  // Auto-collapse: expand only the category of the on-stage participant
+  useEffect(() => {
+    if (!onStageP) return;
+    const activeKey = `${onStageP.round_number || 1}:${onStageP.category || '—'}`;
+    const newCollapsed = {};
+    for (const p of localParts) {
+      const key = `${p.round_number || 1}:${p.category || '—'}`;
+      if (!(key in newCollapsed)) newCollapsed[key] = key !== activeKey;
+    }
+    setCollapsedCats(newCollapsed);
+  }, [onStageP?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const onStageIdx = onStageP ? allSorted.findIndex(p => p.id === onStageP?.id) : -1;
   const nextIdleId = allSorted.slice(onStageIdx + 1).find(p => stageState(p) === 'idle')?.id ?? null;
 
@@ -1666,8 +1661,7 @@ function OrganizerLogin({ onLogin }) {
 }
 
 // ── ScoresTab ─────────────────────────────────────────────────────────────────
-function ScoresTab({ tournamentId }) {
-  const socket = useSocket();
+function ScoresTab({ tournamentId, scoresRefreshTick }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sendingRanking, setSendingRanking] = useState({}); // { 'round:cat': true }
@@ -1701,14 +1695,7 @@ function ScoresTab({ tournamentId }) {
     }
   }, [tournamentId]);
 
-  useEffect(() => { load(); }, [load]);
-
-  // Real-time refresh when any judge saves scores
-  useEffect(() => {
-    if (!socket) return;
-    socket.on('coreo:scores-updated', load);
-    return () => socket.off('coreo:scores-updated', load);
-  }, [socket, load]);
+  useEffect(() => { load(); }, [load, scoresRefreshTick]);
 
   if (loading) return <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '60px' }}>Cargando...</div>;
   if (!data) return null;
@@ -1857,6 +1844,7 @@ export default function CoreoAdmin() {
   const [organizers, setOrganizers] = useState([]);
   const [speakers, setSpeakers] = useState([]);
   const [timing, setTiming] = useState(null);
+  const [scoresRefreshTick, setScoresRefreshTick] = useState(0);
   const [tab, setTab] = useState('config');
   const [toast, setToast] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -1938,6 +1926,7 @@ export default function CoreoAdmin() {
     )));
     socket.on('coreo:poster-updated', ({ poster_path }) => setTournament(prev => prev ? { ...prev, poster_path } : prev));
     socket.on('coreo:timing-updated', setTiming);
+    socket.on('coreo:scores-updated', () => setScoresRefreshTick(t => t + 1));
     socket.on('coreo:staff-msg', (msg) => addToStaffThread({ dir: 'in', ...msg }));
     socket.on('coreo:restarted', () => { load(); loadTiming(); });
     return () => {
@@ -1947,7 +1936,7 @@ export default function CoreoAdmin() {
         'coreo:judge-added', 'coreo:judge-removed', 'coreo:organizer-added',
         'coreo:organizer-removed', 'coreo:speaker-added', 'coreo:speaker-removed',
         'coreo:on-stage', 'coreo:off-stage', 'coreo:timer-started', 'coreo:timer-stopped',
-        'coreo:poster-updated', 'coreo:timing-updated', 'coreo:staff-msg',
+        'coreo:poster-updated', 'coreo:timing-updated', 'coreo:scores-updated', 'coreo:staff-msg',
         'coreo:restarted'].forEach(e => socket.off(e));
     };
   }, [socket, id, load, loadTiming, addToStaffThread]);
@@ -2080,7 +2069,7 @@ export default function CoreoAdmin() {
       {/* Puntuaciones tab: full-width outside the narrow container */}
       {activeTab === 'puntuaciones' && (
         <div style={{ padding: '28px 32px' }}>
-          <ScoresTab tournamentId={Number(id)} />
+          <ScoresTab tournamentId={Number(id)} scoresRefreshTick={scoresRefreshTick} />
         </div>
       )}
 
@@ -2114,6 +2103,7 @@ export default function CoreoAdmin() {
           tournamentStatus={tournament.status}
           staffThread={staffThread}
           onStaffAdd={addToStaffThread}
+          scoresRefreshTick={scoresRefreshTick}
         />
       )}
 
