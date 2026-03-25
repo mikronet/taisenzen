@@ -255,7 +255,7 @@ export default function Landing() {
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: '1.6rem', letterSpacing: '0.2em', color: '#fff',
             textShadow: '0 0 20px rgba(126,207,255,0.5)',
-          }}>ZEN TAISEN</span>
+          }}>ZEN.TAISEN</span>
         </Link>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           <a href="#contacto" style={{
@@ -293,7 +293,7 @@ export default function Landing() {
           color: '#fff',
           textShadow: '0 0 40px rgba(126,207,255,0.6), 0 0 80px rgba(126,207,255,0.2)',
         }}>
-          ZEN TAISEN
+          ZEN.TAISEN
         </h1>
         <p style={{
           color: '#888', fontSize: 'clamp(0.75rem, 2vw, 1rem)',
@@ -315,7 +315,7 @@ export default function Landing() {
             fontSize: '0.95rem', textDecoration: 'none', letterSpacing: '0.05em',
             boxShadow: '0 4px 20px rgba(126,207,255,0.3)',
           }}>
-            Quiero ZEN TAISEN en mi torneo
+            Quiero ZEN.TAISEN en mi torneo
           </a>
         </div>
 
@@ -470,7 +470,7 @@ export default function Landing() {
           ¿Tienes un torneo en mente?
         </h2>
         <p style={{ color: '#666', marginBottom: '32px', fontSize: '1rem', maxWidth: '500px', margin: '0 auto 32px' }}>
-          Cuéntanos tu evento. Te configuramos ZEN TAISEN a tu medida y te acompañamos el día del torneo.
+          Cuéntanos tu evento. Te configuramos ZEN.TAISEN a tu medida y te acompañamos el día del torneo.
         </p>
         <a href="#contacto" style={{
           padding: '15px 40px',
@@ -490,7 +490,7 @@ export default function Landing() {
             Contacto
           </p>
           <h2 style={{ color: '#f0f0f0', fontSize: 'clamp(1.4rem, 3vw, 2rem)', marginBottom: '12px', letterSpacing: '0.05em', textAlign: 'center' }}>
-            ¿Quieres ZEN TAISEN en tu torneo?
+            ¿Quieres ZEN.TAISEN en tu torneo?
           </h2>
           <p style={{ color: '#555', marginBottom: '36px', fontSize: '0.9rem', textAlign: 'center', lineHeight: 1.6 }}>
             Cuéntanos tu evento y te configuramos todo. Te respondemos en menos de 24 h.

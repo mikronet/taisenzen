@@ -162,6 +162,11 @@ function TournamentList({ onLogout }) {
               {t.tournament_type === 'coreografia' && (
                 <span style={{ marginLeft: '6px', fontSize: '0.75rem', color: '#7ecfff', fontWeight: 700, letterSpacing: '0.05em' }}>COREO</span>
               )}
+              {t.created_at && (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '3px' }}>
+                  {new Date(t.created_at).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })}
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               {t.tournament_type === 'coreografia' ? (

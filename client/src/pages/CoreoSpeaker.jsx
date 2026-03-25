@@ -48,7 +48,7 @@ function SpeakerLogin({ onLogin }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a12' }}>
       <form onSubmit={handleSubmit} className="card" style={{ width: '100%', maxWidth: '380px' }}>
-        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>ZEN TAISEN</p>
+        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>ZEN.TAISEN</p>
         <h2 style={{ marginBottom: '8px', color: '#fb923c', fontSize: '0.85rem', letterSpacing: '0.2em' }}>STAFF — COREOGRAFÍA</h2>
         <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Introduce tu código de acceso</p>
         <input
@@ -197,19 +197,50 @@ function SpeakerPanel({ tournament, participants: initialParticipants, speakerNa
     } finally { setSending(false); }
   };
 
-  // Group participants by round, sorted by act_order
+  // Group participants by round → category, sorted by act_order
   const rounds = (() => {
     const sorted = [...participants].sort((a, b) => (a.act_order ?? 9999) - (b.act_order ?? 9999));
-    const map = {}; const order = [];
+    const roundMap = {}; const roundOrder = [];
     for (const p of sorted) {
       const r = p.round_number || 1;
-      if (!map[r]) { map[r] = []; order.push(r); }
-      map[r].push(p);
+      const cat = p.category || '—';
+      if (!roundMap[r]) { roundMap[r] = { catMap: {}, catOrder: [] }; roundOrder.push(r); }
+      if (!roundMap[r].catMap[cat]) { roundMap[r].catMap[cat] = []; roundMap[r].catOrder.push(cat); }
+      roundMap[r].catMap[cat].push(p);
     }
-    return order.map(r => ({ round: r, participants: map[r] }));
+    return roundOrder.map(r => ({
+      round: r,
+      participants: roundMap[r].catOrder.flatMap(cat => roundMap[r].catMap[cat]), // kept for other code
+      categories: roundMap[r].catOrder.map(cat => ({ cat, participants: roundMap[r].catMap[cat] })),
+    }));
   })();
 
+  const [collapsedBlocks, setCollapsedBlocks] = useState({});
+  const [collapsedCats, setCollapsedCats] = useState({});
+
   const onStage = participants.find(p => p.id === onStageId) ?? null;
+
+  // Auto-collapse: expand block+category of active participant (or next idle), collapse the rest
+  useEffect(() => {
+    const sorted = [...participants].sort((a, b) => (a.act_order ?? 9999) - (b.act_order ?? 9999));
+    const focal = onStage ?? sorted.find(p => !p.on_stage && !(p.on_stage_duration_s > 0)) ?? null;
+    if (!focal) return;
+    const focalRound = focal.round_number || 1;
+    const focalKey = `${focalRound}:${focal.category || '—'}`;
+
+    const newBlocks = {};
+    for (const { round } of rounds) {
+      newBlocks[round] = round !== focalRound;
+    }
+    setCollapsedBlocks(newBlocks);
+
+    const newCats = {};
+    for (const p of participants) {
+      const key = `${p.round_number || 1}:${p.category || '—'}`;
+      if (!(key in newCats)) newCats[key] = key !== focalKey;
+    }
+    setCollapsedCats(newCats);
+  }, [onStageId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Find next participant after on-stage
   const allSorted = rounds.flatMap(r => r.participants);
@@ -231,7 +262,7 @@ function SpeakerPanel({ tournament, participants: initialParticipants, speakerNa
       {/* Header */}
       <div style={{ background: '#111', borderBottom: '1px solid #1a1a2e', padding: '12px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
         <div>
-          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.1rem', letterSpacing: '0.25em', color: '#7ecfff' }}>ZEN TAISEN</span>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.1rem', letterSpacing: '0.25em', color: '#7ecfff' }}>ZEN.TAISEN</span>
           <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: '10px', fontSize: '0.8rem' }}>{tournament.name}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -306,42 +337,73 @@ function SpeakerPanel({ tournament, participants: initialParticipants, speakerNa
             <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem', letterSpacing: '0.2em' }}>ORDEN DE ACTUACIÓN</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {rounds.map(({ round, participants: rps }, ri) => {
-              let offset = rounds.slice(0, ri).reduce((n, r) => n + r.participants.length, 0);
-              return (
-                <div key={round}>
-                  {rounds.length > 1 && (
-                    <div style={{ padding: '8px 16px', background: 'rgba(126,207,255,0.04)', borderBottom: '1px solid #1a1a2e', color: '#7ecfff', fontSize: '0.65rem', letterSpacing: '0.2em', fontWeight: 700 }}>
-                      BLOQUE {round}
+            {(() => {
+              let globalCounter = 0;
+              return rounds.map(({ round, categories }) => {
+                const bCollapsed = !!collapsedBlocks[round];
+                return (
+                  <div key={round}>
+                    {/* Block header */}
+                    <div
+                      onClick={() => setCollapsedBlocks(prev => ({ ...prev, [round]: !prev[round] }))}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 16px', background: 'rgba(126,207,255,0.05)', borderBottom: '1px solid #1a1a2e', cursor: 'pointer', userSelect: 'none' }}
+                    >
+                      <span style={{ color: '#7ecfff', fontSize: '0.68rem', letterSpacing: '0.2em', fontWeight: 700, flex: 1, fontFamily: "'Bebas Neue', sans-serif" }}>BLOQUE {round}</span>
+                      <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>{categories.reduce((n, c) => n + c.participants.length, 0)}</span>
+                      <span style={{ color: 'rgba(126,207,255,0.4)', fontSize: '0.65rem' }}>{bCollapsed ? '▶' : '▼'}</span>
                     </div>
-                  )}
-                  {rps.map((p, i) => {
-                    const num = offset + i + 1;
-                    const isNow = p.id === onStageId;
-                    return (
-                      <div key={p.id} style={{
-                        display: 'flex', gap: '10px', alignItems: 'center',
-                        padding: '10px 16px', borderBottom: '1px solid #111',
-                        background: isNow ? 'rgba(251,146,60,0.08)' : 'transparent',
-                      }}>
-                        <span style={{ color: isNow ? '#fb923c' : 'rgba(255,255,255,0.2)', minWidth: '20px', fontSize: '0.8rem', fontWeight: isNow ? 700 : 400 }}>{num}</span>
-                        {p.photo_path
-                          ? <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
-                          : <div style={{ width: '36px', height: '36px', borderRadius: '5px', background: '#1a1a2e', flexShrink: 0 }} />
-                        }
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: isNow ? 700 : 500, fontSize: '0.9rem', color: isNow ? '#fb923c' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                          <div style={{ color: categoryColor(p.category), fontSize: '0.65rem', letterSpacing: '0.08em', marginTop: '1px' }}>{p.category?.toUpperCase()}</div>
+                    {!bCollapsed && categories.map(({ cat, participants: cps }) => {
+                      const cKey = `${round}:${cat}`;
+                      const cCollapsed = !!collapsedCats[cKey];
+                      const hasCatOnStage = cps.some(p => p.id === onStageId);
+                      return (
+                        <div key={cat}>
+                          {/* Category header */}
+                          <div
+                            onClick={() => setCollapsedCats(prev => ({ ...prev, [cKey]: !prev[cKey] }))}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 16px 7px 20px', background: hasCatOnStage ? `${categoryColor(cat)}0a` : 'rgba(255,255,255,0.01)', borderBottom: '1px solid #1a1a2e', cursor: 'pointer', userSelect: 'none' }}
+                          >
+                            <span style={{ color: categoryColor(cat), fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.14em', flex: 1, textTransform: 'uppercase' }}>{cat === '—' ? 'Sin categoría' : cat}</span>
+                            {hasCatOnStage && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fb923c', boxShadow: '0 0 5px #fb923c', display: 'inline-block', animation: 'pulse-stage 1.6s ease-in-out infinite' }} />}
+                            <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.62rem' }}>{cps.length}</span>
+                            <span style={{ color: `${categoryColor(cat)}66`, fontSize: '0.6rem' }}>{cCollapsed ? '▶' : '▼'}</span>
+                          </div>
+                          {!cCollapsed && cps.map(p => {
+                            globalCounter++;
+                            const num = globalCounter;
+                            const isNow = p.id === onStageId;
+                            return (
+                              <div key={p.id} style={{
+                                display: 'flex', gap: '10px', alignItems: 'center',
+                                padding: '10px 16px 10px 24px', borderBottom: '1px solid #111',
+                                background: isNow ? 'rgba(251,146,60,0.08)' : 'transparent',
+                              }}>
+                                <span style={{ color: isNow ? '#fb923c' : 'rgba(255,255,255,0.2)', minWidth: '20px', fontSize: '0.8rem', fontWeight: isNow ? 700 : 400 }}>{num}</span>
+                                {p.photo_path
+                                  ? <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
+                                  : <div style={{ width: '36px', height: '36px', borderRadius: '5px', background: '#1a1a2e', flexShrink: 0 }} />
+                                }
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontWeight: isNow ? 700 : 500, fontSize: '0.9rem', color: isNow ? '#fb923c' : '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                                  {(p.academia || p.localidad) && (
+                                    <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {[p.academia, p.localidad].filter(Boolean).join(' · ')}
+                                    </div>
+                                  )}
+                                </div>
+                                {isNow && (
+                                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fb923c', animation: 'pulse-stage 1.6s ease-in-out infinite', flexShrink: 0 }} />
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                        {isNow && (
-                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#fb923c', animation: 'pulse-stage 1.6s ease-in-out infinite', flexShrink: 0 }} />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+                      );
+                    })}
+                  </div>
+                );
+              });
+            })()}
           </div>
         </div>
 

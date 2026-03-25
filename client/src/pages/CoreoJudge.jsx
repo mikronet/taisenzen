@@ -48,7 +48,7 @@ function JudgeLogin({ onLogin }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a12' }}>
       <form onSubmit={handleSubmit} className="card" style={{ width: '100%', maxWidth: '380px' }}>
-        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>ZEN TAISEN</p>
+        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>ZEN.TAISEN</p>
         <h2 style={{ marginBottom: '20px', color: '#7ecfff', fontSize: '0.85rem', letterSpacing: '0.2em' }}>JUEZ — COREOGRAFÍA</h2>
         <input
           type="text" placeholder="Código de acceso"
@@ -193,11 +193,13 @@ function JudgePanel({ judge, onLogout }) {
   const [participantScores, setParticipantScores] = useState({}); // { pid: { criterionId: score } }
   const [onStageId, setOnStageId] = useState(null);
   const [onStageAt, setOnStageAt] = useState(null); // ms timestamp when timer started
+  const [frozenElapsedS, setFrozenElapsedS] = useState(null); // seconds frozen after FINALIZAR
   const [nowMs, setNowMs] = useState(Date.now());
   const [glowing, setGlowing] = useState(false); // triggers glow burst on new on-stage event
   const [globalScores, setGlobalScores] = useState({}); // { pid: { globalAvg, judgesVoted } }
   const [totalJudges, setTotalJudges] = useState(0);
   const [sidebarCatCollapsed, setSidebarCatCollapsed] = useState({});
+  const [zoomedPhoto, setZoomedPhoto] = useState(null); // path or null — lightbox
   const itemRefs = useRef({}); // participantId → DOM button ref
   const sidebarRef = useRef(null);
 
@@ -281,6 +283,7 @@ function JudgePanel({ judge, onLogout }) {
       } : prev);
       setOnStageId(participant.id);
       setOnStageAt(null); // timer not started yet
+      setFrozenElapsedS(null);
       setSelectedId(participant.id);
       setGlowing(false);
       setTimeout(() => setGlowing(true), 10);
@@ -292,12 +295,15 @@ function JudgePanel({ judge, onLogout }) {
       } : prev);
       setOnStageId(null);
       setOnStageAt(null);
+      setFrozenElapsedS(null);
     });
     socket.on('coreo:timer-started', ({ on_stage_at }) => {
       setOnStageAt(on_stage_at);
+      setFrozenElapsedS(null);
     });
-    socket.on('coreo:timer-stopped', () => {
+    socket.on('coreo:timer-stopped', ({ on_stage_duration_s }) => {
       setOnStageAt(null);
+      setFrozenElapsedS(on_stage_duration_s ?? null);
     });
     return () => {
       socket.off('connect', join);
@@ -314,10 +320,23 @@ function JudgePanel({ judge, onLogout }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a12', color: '#fff' }}>
+      {/* Photo lightbox */}
+      {zoomedPhoto && (
+        <div
+          onClick={() => setZoomedPhoto(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
+        >
+          <img
+            src={`/uploads/${zoomedPhoto}`}
+            alt=""
+            style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '10px', boxShadow: '0 0 60px rgba(0,0,0,0.8)' }}
+          />
+        </div>
+      )}
       {/* Header */}
       <div style={{ background: '#111', borderBottom: '1px solid #1a1a2e', padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.2rem', letterSpacing: '0.2em', color: '#7ecfff' }}>ZEN TAISEN</span>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.2rem', letterSpacing: '0.2em', color: '#7ecfff' }}>ZEN.TAISEN</span>
           <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: '12px', fontSize: '0.8rem' }}>JUEZ: {judge.name}</span>
         </div>
         <button onClick={onLogout} style={{ background: 'none', border: '1px solid #333', color: '#666', fontSize: '0.75rem', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer' }}>Salir</button>
@@ -325,7 +344,7 @@ function JudgePanel({ judge, onLogout }) {
 
       <div style={{ display: 'flex', height: 'calc(100vh - 57px)' }}>
         {/* Sidebar: participant list */}
-        <div ref={sidebarRef} style={{ width: '200px', borderRight: '1px solid #1a1a2e', overflowY: 'auto', flexShrink: 0 }}>
+        <div ref={sidebarRef} style={{ width: '240px', borderRight: '1px solid #1a1a2e', overflowY: 'auto', flexShrink: 0 }}>
           {(() => {
             // Rank map: position within same round+category by avg score
             const pidInfo = {};
@@ -371,9 +390,9 @@ function JudgePanel({ judge, onLogout }) {
                     <div key={cat}>
                       <div
                         onClick={() => setSidebarCatCollapsed(prev => ({ ...prev, [cKey]: !prev[cKey] }))}
-                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '5px 12px', cursor: 'pointer', userSelect: 'none', background: hasCatOnStage ? 'rgba(126,207,255,0.04)' : 'none', borderBottom: '1px solid #1a1a2e' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 12px', cursor: 'pointer', userSelect: 'none', background: hasCatOnStage ? 'rgba(126,207,255,0.04)' : 'none', borderBottom: '1px solid #1a1a2e' }}
                       >
-                        <span style={{ color: categoryColor(cat), fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', flex: 1 }}>{cat === '—' ? 'Sin categoría' : cat}</span>
+                        <span style={{ color: categoryColor(cat), fontSize: '0.78rem', fontWeight: 700, letterSpacing: '0.12em', flex: 1 }}>{cat === '—' ? 'Sin categoría' : cat}</span>
                         {hasCatOnStage && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#7ecfff', boxShadow: '0 0 5px #7ecfff', display: 'inline-block', animation: 'dotPulse 1.5s ease-in-out infinite' }} />}
                         <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.6rem' }}>{catCollapsed ? '▶' : '▼'}</span>
                       </div>
@@ -425,15 +444,27 @@ function JudgePanel({ judge, onLogout }) {
                               )}
                               {isSaved && <span style={{ color: '#34d399', fontSize: '0.65rem' }}>✓</span>}
                             </div>
-                            <div style={{
-                              color: isOnStage ? '#fff' : isSelected ? '#fff' : 'rgba(255,255,255,0.65)',
-                              fontSize: '0.85rem', marginTop: '2px', lineHeight: 1.3,
-                              fontWeight: isOnStage ? 700 : 400,
-                              textShadow: isOnStage && glowing ? '0 0 8px rgba(126,207,255,0.5)' : 'none',
-                            }}>{p.name}</div>
-                            {p.age_group && (
-                              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', marginTop: '2px' }}>{p.age_group}</div>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginTop: '4px' }}>
+                              {p.photo_path && (
+                                <img
+                                  src={`/uploads/${p.photo_path}`}
+                                  alt=""
+                                  onClick={e => { e.stopPropagation(); setZoomedPhoto(p.photo_path); }}
+                                  style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0, cursor: 'zoom-in', border: isOnStage ? '1px solid rgba(126,207,255,0.4)' : '1px solid rgba(255,255,255,0.08)' }}
+                                />
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{
+                                  color: isOnStage ? '#fff' : isSelected ? '#fff' : 'rgba(255,255,255,0.65)',
+                                  fontSize: '0.85rem', lineHeight: 1.3,
+                                  fontWeight: isOnStage ? 700 : 400,
+                                  textShadow: isOnStage && glowing ? '0 0 8px rgba(126,207,255,0.5)' : 'none',
+                                }}>{p.name}</div>
+                                {p.age_group && (
+                                  <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', marginTop: '2px' }}>{p.age_group}</div>
+                                )}
+                              </div>
+                            </div>
                             {(() => {
                               const gs = globalScores[p.id];
                               const rank = rankMap[p.id];
@@ -472,30 +503,43 @@ function JudgePanel({ judge, onLogout }) {
               <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.85rem', letterSpacing: '0.15em' }}>Esperando al primer participante en escena...</p>
             </div>
           ) : (
-            <div style={{ maxWidth: '560px', margin: '0 auto' }}>
-              {/* Participant card */}
-              <div style={{ marginBottom: '28px' }}>
-                {selected.photo_path && (
-                  <img
-                    src={`/uploads/${selected.photo_path}`}
-                    alt={selected.name}
-                    style={{ width: '100%', height: '220px', objectFit: 'cover', borderRadius: '10px', border: '2px solid rgba(126,207,255,0.2)', display: 'block', marginBottom: '14px' }}
-                  />
-                )}
-                <div>
-                  {selected.id === onStageId && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', display: 'inline-block', boxShadow: '0 0 8px #7ecfff', animation: 'dotPulse 1.5s ease-in-out infinite' }} />
-                      <span style={{ color: '#7ecfff', fontSize: '0.7rem', letterSpacing: '0.2em', fontWeight: 700 }}>EN ESCENA</span>
-                      {onStageAt && (
-                        <span style={{ fontFamily: 'monospace', fontSize: '1.1rem', fontWeight: 700, color: '#7ecfff', letterSpacing: '0.05em' }}>
-                          {fmtTimer(Math.max(0, Math.floor((nowMs - onStageAt) / 1000)))}
-                        </span>
-                      )}
-                    </div>
-                  )}
+            <div style={{ maxWidth: '560px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+
+              {/* ── Frame 1: EN ESCENA ── */}
+              {selected.id === onStageId && (
+                <div style={{ border: '1px solid rgba(126,207,255,0.25)', borderRadius: '12px', overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 16px', background: 'rgba(126,207,255,0.05)', borderBottom: '1px solid rgba(126,207,255,0.1)' }}>
+                    <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.15em' }}>EN ESCENA</span>
+                  </div>
+                  <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#7ecfff', display: 'inline-block', boxShadow: '0 0 8px #7ecfff', animation: 'dotPulse 1.5s ease-in-out infinite', flexShrink: 0 }} />
+                    {(onStageAt || frozenElapsedS != null) && (
+                      <span style={{ fontFamily: 'monospace', fontSize: '1.4rem', fontWeight: 700, color: '#7ecfff', letterSpacing: '0.05em' }}>
+                        {fmtTimer(onStageAt ? Math.max(0, Math.floor((nowMs - onStageAt) / 1000)) : frozenElapsedS)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Frame 2: DATOS DEL PARTICIPANTE ── */}
+              <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '10px 16px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.45)', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.15em' }}>DATOS DEL PARTICIPANTE</span>
+                </div>
+                <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-                    <h2 style={{ margin: 0, fontSize: '1.4rem', letterSpacing: '0.05em' }}>{selected.name}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+                      {selected.photo_path && (
+                        <img
+                          src={`/uploads/${selected.photo_path}`}
+                          alt={selected.name}
+                          onClick={() => setZoomedPhoto(selected.photo_path)}
+                          style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0, cursor: 'zoom-in', border: '1px solid rgba(126,207,255,0.2)' }}
+                        />
+                      )}
+                      <h2 style={{ margin: 0, fontSize: '1.4rem', letterSpacing: '0.05em' }}>{selected.name}</h2>
+                    </div>
                     {(() => {
                       const ps = participantScores[selected.id];
                       if (!ps || !state.criteria.length) return null;
@@ -510,7 +554,7 @@ function JudgePanel({ judge, onLogout }) {
                       );
                     })()}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '10px' }}>
                     <span style={{ color: categoryColor(selected.category), fontSize: '0.75rem', letterSpacing: '0.15em', fontWeight: 700 }}>{selected.category}</span>
                     {selected.age_group && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>{selected.age_group}</span>}
                   </div>
@@ -522,25 +566,33 @@ function JudgePanel({ judge, onLogout }) {
                 </div>
               </div>
 
-              {/* Score form */}
-              {state.criteria.length === 0 ? (
-                <p style={{ color: 'rgba(255,255,255,0.3)' }}>No hay criterios configurados aún.</p>
-              ) : (
-                <ScoreForm
-                  key={selected.id}
-                  participant={selected}
-                  criteria={state.criteria}
-                  judgeId={judge.id}
-                  onSaved={(pid, scores) => {
-                    setSavedIds(prev => new Set(prev).add(pid));
-                    setParticipantScores(prev => ({ ...prev, [pid]: scores }));
-                  }}
-                  onLoaded={(pid, scores, hasSaved) => {
-                    setParticipantScores(prev => ({ ...prev, [pid]: scores }));
-                    if (hasSaved) setSavedIds(prev => new Set(prev).add(pid));
-                  }}
-                />
-              )}
+              {/* ── Frame 3: CRITERIOS ── */}
+              <div style={{ border: '1px solid rgba(167,139,250,0.2)', borderRadius: '12px', overflow: 'hidden' }}>
+                <div style={{ padding: '10px 16px', background: 'rgba(167,139,250,0.04)', borderBottom: '1px solid rgba(167,139,250,0.1)' }}>
+                  <span style={{ color: '#a78bfa', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.15em' }}>CRITERIOS</span>
+                </div>
+                <div style={{ padding: '16px' }}>
+                  {state.criteria.length === 0 ? (
+                    <p style={{ color: 'rgba(255,255,255,0.3)', margin: 0 }}>No hay criterios configurados aún.</p>
+                  ) : (
+                    <ScoreForm
+                      key={selected.id}
+                      participant={selected}
+                      criteria={state.criteria}
+                      judgeId={judge.id}
+                      onSaved={(pid, scores) => {
+                        setSavedIds(prev => new Set(prev).add(pid));
+                        setParticipantScores(prev => ({ ...prev, [pid]: scores }));
+                      }}
+                      onLoaded={(pid, scores, hasSaved) => {
+                        setParticipantScores(prev => ({ ...prev, [pid]: scores }));
+                        if (hasSaved) setSavedIds(prev => new Set(prev).add(pid));
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+
             </div>
           )}
         </div>

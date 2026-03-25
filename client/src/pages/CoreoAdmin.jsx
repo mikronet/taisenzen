@@ -151,31 +151,34 @@ function SetupChecklist({ criteria, categories, participants, judges, onNavigate
   const allDone = doneCount === steps.length;
   const pct = Math.round((doneCount / steps.length) * 100);
 
+  const accent = allDone ? '#34d399' : '#fb923c';
+  const accentAlpha = (a) => allDone ? `rgba(52,211,153,${a})` : `rgba(251,146,60,${a})`;
+
   return (
-    <div style={{ marginBottom: '28px', borderRadius: '10px', border: `1px solid ${allDone ? 'rgba(52,211,153,0.25)' : 'rgba(126,207,255,0.15)'}`, overflow: 'hidden' }}>
+    <div style={{ marginBottom: '28px', borderRadius: '10px', border: `1px solid ${accentAlpha(0.35)}`, overflow: 'hidden', boxShadow: allDone ? 'none' : `0 0 18px rgba(251,146,60,0.1)` }}>
       {/* Header */}
       <div
         onClick={toggle}
-        style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', cursor: 'pointer', background: allDone ? 'rgba(52,211,153,0.06)' : 'rgba(126,207,255,0.04)', userSelect: 'none' }}
+        style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 18px', cursor: 'pointer', background: accentAlpha(0.07), userSelect: 'none' }}
       >
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: collapsed ? 0 : '8px' }}>
-            <span style={{ color: allDone ? '#34d399' : '#7ecfff', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.1em' }}>
+            <span style={{ color: accent, fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em' }}>
               {allDone ? '✓ TODO LISTO PARA EMPEZAR' : `PREPARACIÓN DEL EVENTO — ${doneCount} de ${steps.length} pasos completados`}
             </span>
           </div>
           {!collapsed && (
-            <div style={{ height: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: allDone ? '#34d399' : '#7ecfff', borderRadius: '2px', transition: 'width 0.4s ease' }} />
+            <div style={{ height: '5px', background: 'rgba(255,255,255,0.08)', borderRadius: '3px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${pct}%`, background: accent, borderRadius: '3px', transition: 'width 0.4s ease' }} />
             </div>
           )}
         </div>
-        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem' }}>{collapsed ? 'Ver pasos ↓' : 'Ocultar ↑'}</span>
+        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>{collapsed ? 'Ver pasos ↓' : 'Ocultar ↑'}</span>
       </div>
 
       {/* Steps */}
       {!collapsed && (
-        <div style={{ padding: '4px 0 10px' }}>
+        <div style={{ padding: '4px 0 10px', background: accentAlpha(0.02) }}>
           {steps.map((s, i) => (
             <div
               key={i}
@@ -185,16 +188,16 @@ function SetupChecklist({ criteria, categories, participants, judges, onNavigate
                 padding: '10px 18px', cursor: s.done ? 'default' : 'pointer',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={e => { if (!s.done) e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+              onMouseEnter={e => { if (!s.done) e.currentTarget.style.background = accentAlpha(0.05); }}
               onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
             >
               <div style={{
                 width: '22px', height: '22px', borderRadius: '50%', flexShrink: 0, marginTop: '1px',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: s.done ? 'rgba(52,211,153,0.15)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${s.done ? '#34d399' : 'rgba(255,255,255,0.15)'}`,
+                background: s.done ? 'rgba(52,211,153,0.15)' : accentAlpha(0.12),
+                border: `1px solid ${s.done ? '#34d399' : accentAlpha(0.5)}`,
                 fontSize: '0.7rem', fontWeight: 700,
-                color: s.done ? '#34d399' : 'rgba(255,255,255,0.3)',
+                color: s.done ? '#34d399' : accent,
               }}>
                 {s.done ? '✓' : i + 1}
               </div>
@@ -202,9 +205,9 @@ function SetupChecklist({ criteria, categories, participants, judges, onNavigate
                 <div style={{ fontSize: '0.85rem', fontWeight: s.done ? 400 : 600, color: s.done ? 'rgba(255,255,255,0.35)' : '#fff', textDecoration: s.done ? 'line-through' : 'none' }}>
                   {s.label}
                 </div>
-                {!s.done && <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{s.hint}</div>}
+                {!s.done && <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', marginTop: '2px' }}>{s.hint}</div>}
               </div>
-              {!s.done && <span style={{ color: '#7ecfff', fontSize: '0.72rem', alignSelf: 'center', flexShrink: 0 }}>Ir →</span>}
+              {!s.done && <span style={{ color: accent, fontSize: '0.72rem', alignSelf: 'center', flexShrink: 0, fontWeight: 700 }}>Ir →</span>}
             </div>
           ))}
         </div>
@@ -393,90 +396,102 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
       </div>
     )}
 
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '56px', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
       {/* ── Left column: event config ── */}
-      <div>
-        {/* Rounds */}
-        <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>NÚMERO DE BLOQUES</h3>
-        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Los participantes se asignan a una bloque. El orden de actuación se agrupa: Bloque → Categoría → Participante.</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <input
-            type="number" min={1} max={20}
-            value={rounds}
-            onChange={e => { setRounds(Math.max(1, Number(e.target.value) || 1)); markConfigDirty(); }}
-            style={{ width: '80px' }}
-          />
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
-            {rounds === 1 ? '1 bloque' : `${rounds} bloques`}
-          </span>
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {SECTION_DIVIDER}
-
-        {/* Categories */}
-        <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CATEGORÍAS</h3>
-        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Crea las categorías de este evento. El orden aquí determina el orden en los desplegables.</p>
-        <form onSubmit={addCategory} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-          <input
-            placeholder="Nueva categoría (ej: Solo, Parejas, Grupo...)"
-            value={newCat}
-            onChange={e => setNewCat(e.target.value)}
-            style={{ flex: 1 }}
-          />
-          <button type="submit" className="btn-secondary">+ Añadir</button>
-        </form>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-          {catList.length === 0 && <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Sin categorías definidas.</p>}
-          {catList.map((cat, i) => (
-            <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '10px 14px' }}>
-              <span style={{ flex: 1, color: categoryColor(cat), fontWeight: 600, fontSize: '0.95rem' }}>{cat}</span>
-              <button onClick={() => moveCategoryItem(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid #333', color: i === 0 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '4px 9px', cursor: i === 0 ? 'default' : 'pointer', fontSize: '0.85rem' }}>↑</button>
-              <button onClick={() => moveCategoryItem(i, 1)} disabled={i === catList.length - 1} style={{ background: 'none', border: '1px solid #333', color: i === catList.length - 1 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '4px 9px', cursor: i === catList.length - 1 ? 'default' : 'pointer', fontSize: '0.85rem' }}>↓</button>
-              <button onClick={() => removeCategory(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '4px 9px', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button onClick={saveConfig} className="btn-primary" disabled={savingConfig}>
-            {savingConfig ? 'Guardando...' : 'Guardar categorías y bloques'}
-          </button>
-          <SaveStatus dirty={configDirty} saved={configSaved} savedMsg="Categorías y bloques guardados" />
-        </div>
-
-        {SECTION_DIVIDER}
-
-        {/* Criteria */}
-        <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CRITERIOS DE PUNTUACIÓN</h3>
-        <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Define los criterios con los que los jueces puntuarán cada actuación.</p>
-        {criteriaList.map((c, i) => (
-          <div key={c.id ?? i} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
-            <input
-              placeholder={`Criterio ${i + 1} (ej: Técnica, Expresión...)`}
-              value={c.name}
-              onChange={e => updateCriterion(i, 'name', e.target.value)}
-              style={{ flex: 1 }}
-            />
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>0 –</span>
-              <input
-                type="number" min={1} max={100} step={0.5}
-                value={c.max_score}
-                onChange={e => updateCriterion(i, 'max_score', e.target.value)}
-                style={{ width: '70px' }}
-              />
-            </div>
-            <button onClick={() => removeCriterion(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }}>✕</button>
+        {/* Frame 1: Bloques + Categorías */}
+        <div style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
+          <div style={{ padding: '12px 20px', background: 'rgba(126,207,255,0.04)', borderBottom: '1px solid rgba(126,207,255,0.1)' }}>
+            <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.15em' }}>BLOQUES Y CATEGORÍAS</span>
           </div>
-        ))}
-        <div style={{ display: 'flex', gap: '10px', marginTop: '12px', alignItems: 'center' }}>
-          <button onClick={addCriterion} className="btn-secondary">+ Añadir criterio</button>
-          <button onClick={saveCriteria} className="btn-primary" disabled={savingCriteria}>{savingCriteria ? 'Guardando...' : 'Guardar criterios'}</button>
-          <SaveStatus dirty={criteriaDirty} saved={criteriaSaved} savedMsg="Criterios guardados" />
+          <div style={{ padding: '20px' }}>
+            {/* Rounds */}
+            <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>NÚMERO DE BLOQUES</h3>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Los participantes se asignan a un bloque. El orden de actuación se agrupa: Bloque → Categoría → Participante.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <input
+                type="number" min={1} max={20}
+                value={rounds}
+                onChange={e => { setRounds(Math.max(1, Number(e.target.value) || 1)); markConfigDirty(); }}
+                style={{ width: '80px' }}
+              />
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
+                {rounds === 1 ? '1 bloque' : `${rounds} bloques`}
+              </span>
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.07)', margin: '24px 0' }} />
+
+            {/* Categories */}
+            <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CATEGORÍAS</h3>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Crea las categorías de este evento. El orden aquí determina el orden en los desplegables.</p>
+            <form onSubmit={addCategory} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <input
+                placeholder="Nueva categoría (ej: Solo, Parejas, Grupo...)"
+                value={newCat}
+                onChange={e => setNewCat(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <button type="submit" className="btn-secondary">+ Añadir</button>
+            </form>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+              {catList.length === 0 && <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Sin categorías definidas.</p>}
+              {catList.map((cat, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '10px 14px' }}>
+                  <span style={{ flex: 1, color: categoryColor(cat), fontWeight: 600, fontSize: '0.95rem' }}>{cat}</span>
+                  <button onClick={() => moveCategoryItem(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid #333', color: i === 0 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '4px 9px', cursor: i === 0 ? 'default' : 'pointer', fontSize: '0.85rem' }}>↑</button>
+                  <button onClick={() => moveCategoryItem(i, 1)} disabled={i === catList.length - 1} style={{ background: 'none', border: '1px solid #333', color: i === catList.length - 1 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '4px 9px', cursor: i === catList.length - 1 ? 'default' : 'pointer', fontSize: '0.85rem' }}>↓</button>
+                  <button onClick={() => removeCategory(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '4px 9px', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <button onClick={saveConfig} className="btn-primary" disabled={savingConfig}>
+                {savingConfig ? 'Guardando...' : 'Guardar categorías y bloques'}
+              </button>
+              <SaveStatus dirty={configDirty} saved={configSaved} savedMsg="Categorías y bloques guardados" />
+            </div>
+          </div>
         </div>
 
-        {SECTION_DIVIDER}
+        {/* Frame 2: Criterios */}
+        <div style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
+          <div style={{ padding: '12px 20px', background: 'rgba(126,207,255,0.04)', borderBottom: '1px solid rgba(126,207,255,0.1)' }}>
+            <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.15em' }}>CRITERIOS DE PUNTUACIÓN</span>
+          </div>
+          <div style={{ padding: '20px' }}>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Define los criterios con los que los jueces puntuarán cada actuación.</p>
+            {criteriaList.map((c, i) => (
+              <div key={c.id ?? i} style={{ display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' }}>
+                <input
+                  placeholder={`Criterio ${i + 1} (ej: Técnica, Expresión...)`}
+                  value={c.name}
+                  onChange={e => updateCriterion(i, 'name', e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>0 –</span>
+                  <input
+                    type="number" min={1} max={100} step={0.5}
+                    value={c.max_score}
+                    onChange={e => updateCriterion(i, 'max_score', e.target.value)}
+                    style={{ width: '70px' }}
+                  />
+                </div>
+                <button onClick={() => removeCriterion(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }}>✕</button>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '12px', alignItems: 'center' }}>
+              <button onClick={addCriterion} className="btn-secondary">+ Añadir criterio</button>
+              <button onClick={saveCriteria} className="btn-primary" disabled={savingCriteria}>{savingCriteria ? 'Guardando...' : 'Guardar criterios'}</button>
+              <SaveStatus dirty={criteriaDirty} saved={criteriaSaved} savedMsg="Criterios guardados" />
+            </div>
+          </div>
+        </div>
 
-        {/* Poster */}
+        {/* Poster (no frame, secondary) */}
+        <div>
         <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CARTEL DEL TORNEO</h3>
         <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Imagen que aparece de fondo en la pantalla pública.</p>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '8px' }}>
@@ -508,10 +523,16 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
             <input type="file" ref={posterRef} accept="image/*" onChange={handlePosterChange} style={{ display: 'none' }} />
           </div>
         </div>
-      </div>
+        </div>{/* end poster div */}
+      </div>{/* end left column */}
 
-      {/* ── Right column: judges + organizers ── */}
-      <div>
+      {/* ── Right column: judges + organizers + staff ── */}
+      <div style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
+        <div style={{ padding: '12px 20px', background: 'rgba(126,207,255,0.04)', borderBottom: '1px solid rgba(126,207,255,0.1)' }}>
+          <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.15em' }}>ACCESOS</span>
+        </div>
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '0' }}>
+
         {/* Judges */}
         <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '1rem' }}>JUECES</h3>
         {isAdmin && (
@@ -541,7 +562,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
         </div>
 
         {isAdmin && (<>
-          {SECTION_DIVIDER}
+          <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.07)', margin: '24px 0' }} />
 
           {/* Organizers */}
           <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '1rem' }}>ORGANIZADORES</h3>
@@ -569,35 +590,37 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
             <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', margin: 0 }}>El organizador accede en <strong style={{ color: '#a78bfa' }}>/coreo-organizer</strong> con su código</p>
           </div>
 
-          {SECTION_DIVIDER}
+          <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.07)', margin: '24px 0' }} />
 
           {/* Staff */}
-          <h3 style={{ color: '#fb923c', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '1rem' }}>STAFF</h3>
+          <h3 style={{ color: '#7ecfff', marginBottom: '12px', letterSpacing: '0.1em', fontSize: '1rem' }}>STAFF</h3>
           <form onSubmit={addSpeaker} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
             <input placeholder="Nombre del miembro de staff" value={newSpeaker} onChange={e => setNewSpeaker(e.target.value)} style={{ flex: 1 }} />
-            <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg,#fb923c,#ea580c)', border: 'none' }}>Crear</button>
+            <button type="submit" className="btn-primary">Crear</button>
           </form>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {(speakers || []).map(s => (
               <div key={s.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px' }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: '1rem' }}>{s.name}</div>
-                  <div style={{ color: '#fb923c', fontSize: '0.85rem', fontFamily: 'monospace', marginTop: '4px' }}>{s.access_code}</div>
+                  <div style={{ color: '#7ecfff', fontSize: '0.85rem', fontFamily: 'monospace', marginTop: '4px' }}>{s.access_code}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                  <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-speaker?code=${s.access_code}`, label: `STAFF · ${s.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#fb923c' }}>QR</button>
-                  <button onClick={() => window.open(`${window.location.origin}/coreo-speaker?code=${s.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#fb923c' }}>🔗</button>
+                  <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-speaker?code=${s.access_code}`, label: `STAFF · ${s.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#7ecfff' }}>QR</button>
+                  <button onClick={() => window.open(`${window.location.origin}/coreo-speaker?code=${s.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#7ecfff' }}>🔗</button>
                   <button className="btn-danger" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => removeSpeaker(s.id)}>Eliminar</button>
                 </div>
               </div>
             ))}
             {!(speakers || []).length && <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.88rem', padding: '10px 0' }}>Sin staff.</p>}
           </div>
-          <div style={{ marginTop: '10px', padding: '12px 16px', background: 'rgba(251,146,60,0.04)', borderRadius: '8px', border: '1px solid rgba(251,146,60,0.1)' }}>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', margin: 0 }}>El staff accede en <strong style={{ color: '#fb923c' }}>/coreo-speaker</strong> con su código</p>
+          <div style={{ marginTop: '10px', padding: '12px 16px', background: 'rgba(126,207,255,0.04)', borderRadius: '8px', border: '1px solid rgba(126,207,255,0.1)' }}>
+            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.82rem', margin: 0 }}>El staff accede en <strong style={{ color: '#7ecfff' }}>/coreo-speaker</strong> con su código</p>
           </div>
         </>)}
-      </div>
+
+        </div>{/* end padding div */}
+      </div>{/* end right frame */}
     </div>
     </>
   );
@@ -1179,6 +1202,7 @@ const _twReset = () => ({ running: false, startMs: null, pausedMs: 0 });
 const _twElapsed = (t, now) => !t ? 0 : t.running ? now - t.startMs : (t.pausedMs ?? 0);
 
 function TimingWidget({ timing, tournamentStatus }) {
+  const [collapsed, setCollapsed] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);
@@ -1209,7 +1233,49 @@ function TimingWidget({ timing, tournamentStatus }) {
     setTourTimer(prev => prev?.running ? prev : { running: true, startMs: ref - (prev?.pausedMs ?? 0), pausedMs: 0 });
     setBlockTimers(prev => prev[bKey]?.running ? prev : { ...prev, [bKey]: { running: true, startMs: ref - (prev[bKey]?.pausedMs ?? 0), pausedMs: 0 } });
     setCatTimers(prev => prev[cKey]?.running ? prev : { ...prev, [cKey]: { running: true, startMs: ref - (prev[cKey]?.pausedMs ?? 0), pausedMs: 0 } });
-  }, [timing?.participants]);
+  }, [timing?.participants]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-stop category / block timers when all participants in them have finished
+  useEffect(() => {
+    if (!timing?.participants?.length) return;
+    const snap = Date.now();
+    const groups = {};
+    for (const p of timing.participants) {
+      const r = String(p.round_number || 1);
+      const cat = p.category || '—';
+      if (!groups[r]) groups[r] = {};
+      if (!groups[r][cat]) groups[r][cat] = { done: 0, total: 0, inProgress: false };
+      groups[r][cat].total++;
+      if (p.on_stage) groups[r][cat].inProgress = true;
+      else if (p.on_stage_duration_s > 0) groups[r][cat].done++;
+    }
+    setCatTimers(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [r, cats] of Object.entries(groups)) {
+        for (const [cat, s] of Object.entries(cats)) {
+          const cKey = `${r}:${cat}`;
+          if (s.total > 0 && s.done === s.total && !s.inProgress && prev[cKey]?.running) {
+            next[cKey] = _twPause(prev[cKey], snap);
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+    setBlockTimers(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [r, cats] of Object.entries(groups)) {
+        const allDone = Object.values(cats).every(s => s.total > 0 && s.done === s.total && !s.inProgress);
+        if (allDone && prev[r]?.running) {
+          next[r] = _twPause(prev[r], snap);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [timing?.participants]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!timing?.started_at) return null;
 
@@ -1238,7 +1304,15 @@ function TimingWidget({ timing, tournamentStatus }) {
   const tourMs = _twElapsed(tourTimer, now);
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px' }}>
+    <div style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '12px' }}>
+      <div
+        onClick={() => setCollapsed(c => !c)}
+        style={{ padding: '10px 16px', background: 'rgba(126,207,255,0.04)', borderBottom: collapsed ? 'none' : '1px solid rgba(126,207,255,0.1)', borderRadius: collapsed ? '12px' : '12px 12px 0 0', cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+      >
+        <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.15em' }}>CRONÓMETROS</span>
+        <span style={{ color: 'rgba(126,207,255,0.4)', fontSize: '0.65rem' }}>{collapsed ? '▶' : '▼'}</span>
+      </div>
+      {!collapsed && <div style={{ padding: '12px 16px' }}>
       {/* Cronómetro total */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
         <TimerRow
@@ -1308,12 +1382,14 @@ function TimingWidget({ timing, tournamentStatus }) {
           </div>
         );
       })}
+      </div>}{/* end padding div */}
     </div>
   );
 }
 
 function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd, scoresRefreshTick }) {
   const [loading, setLoading] = useState(null);
+  const [iframeCollapsed, setIframeCollapsed] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
   // Local participant state (augments parent state with real-time timer fields)
   const [localParts, setLocalParts] = useState(participants);
@@ -1327,15 +1403,48 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
 
   // allVotedMap: { [participantId]: true } — set when all judges have voted
   const [allVotedMap, setAllVotedMap] = useState({});
+  const [judgesList, setJudgesList] = useState([]);
+  // judgesVotedMap: { [participantId]: Set<judgeId> }
+  const [judgesVotedMap, setJudgesVotedMap] = useState({});
+  // globalAvgMap: { [participantId]: number } — for computing top 3
+  const [globalAvgMap, setGlobalAvgMap] = useState({});
 
   const loadVotes = useCallback(async () => {
     const r = await apiFetch(`/api/coreo/tournaments/${tournamentId}/scores/summary`);
     if (!r.ok) return;
     const d = await r.json();
     const map = {};
-    for (const p of (d.participants || [])) { if (p.allVoted) map[p.id] = true; }
+    const votedMap = {};
+    const avgMap = {};
+    for (const p of (d.participants || [])) {
+      if (p.allVoted) map[p.id] = true;
+      votedMap[p.id] = new Set(Object.keys(p.judgeScores || {}).map(Number));
+      if (p.globalAvg != null) avgMap[p.id] = p.globalAvg;
+    }
     setAllVotedMap(map);
+    setJudgesList(d.judges || []);
+    setJudgesVotedMap(votedMap);
+    setGlobalAvgMap(avgMap);
   }, [tournamentId]);
+
+  const [sendingRanking, setSendingRanking] = useState({});
+  const sendCategoryRanking = async (round, cat, cps) => {
+    const key = `${round}:${cat}`;
+    setSendingRanking(prev => ({ ...prev, [key]: true }));
+    try {
+      const top3 = [...cps]
+        .filter(p => globalAvgMap[p.id] != null)
+        .sort((a, b) => (globalAvgMap[b.id] ?? 0) - (globalAvgMap[a.id] ?? 0))
+        .slice(0, 3)
+        .map(p => ({ name: p.name, total: globalAvgMap[p.id] }));
+      await apiFetch(`/api/coreo/tournaments/${tournamentId}/speaker/send`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'ranking', ranking: [{ round, categories: [{ category: cat, top3 }] }] }),
+      });
+    } finally {
+      setSendingRanking(prev => ({ ...prev, [key]: false }));
+    }
+  };
 
   useEffect(() => { loadVotes(); }, [loadVotes, scoresRefreshTick]);
 
@@ -1379,16 +1488,30 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
   const partIdxMap = Object.fromEntries(allSorted.map((p, i) => [p.id, i + 1]));
   const onStageP = localParts.find(p => p.on_stage);
 
-  // Auto-collapse: expand only the category of the on-stage participant
+  // Auto-collapse: expand block+category of active participant (or next-in-line), collapse the rest
   useEffect(() => {
-    if (!onStageP) return;
-    const activeKey = `${onStageP.round_number || 1}:${onStageP.category || '—'}`;
-    const newCollapsed = {};
+    // Determine the focal participant: on-stage first, else first idle (SIGUIENTE target)
+    const focal = onStageP ?? (
+      [...localParts]
+        .sort((a, b) => (a.act_order ?? 9999) - (b.act_order ?? 9999))
+        .find(p => !p.on_stage && p.on_stage_duration_s === 0)
+    );
+    if (!focal) return;
+    const focalRound = String(focal.round_number || 1);
+    const focalKey = `${focalRound}:${focal.category || '—'}`;
+
+    const newBlocks = {};
+    for (const { round } of rounds) {
+      newBlocks[String(round)] = String(round) !== focalRound;
+    }
+    setCollapsedBlocks(newBlocks);
+
+    const newCats = {};
     for (const p of localParts) {
       const key = `${p.round_number || 1}:${p.category || '—'}`;
-      if (!(key in newCollapsed)) newCollapsed[key] = key !== activeKey;
+      if (!(key in newCats)) newCats[key] = key !== focalKey;
     }
-    setCollapsedCats(newCollapsed);
+    setCollapsedCats(newCats);
   }, [onStageP?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const onStageIdx = onStageP ? allSorted.findIndex(p => p.id === onStageP?.id) : -1;
   const nextIdleId = allSorted.slice(onStageIdx + 1).find(p => stageState(p) === 'idle')?.id ?? null;
@@ -1440,20 +1563,22 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
 
   const elapsedS = onStageP?.on_stage_at
     ? Math.max(0, Math.floor((nowMs - onStageP.on_stage_at) / 1000))
-    : null;
+    : onStageP?.on_stage_duration_s > 0 ? Math.round(onStageP.on_stage_duration_s) : null;
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 109px)', overflow: 'hidden' }}>
 
       {/* ── Left: control panel ── */}
-      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', borderRight: '1px solid #1a1a2e', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', borderRight: iframeCollapsed ? 'none' : '1px solid #1a1a2e', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
 
         <TimingWidget timing={timing} tournamentStatus={tournamentStatus} />
 
         {/* Participant list */}
-        <div>
-          <h3 style={{ color: '#fb923c', letterSpacing: '0.12em', fontSize: '0.82rem', margin: '0 0 12px 0' }}>CONTROL DE ESCENA</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ border: '1px solid rgba(251,146,60,0.2)', borderRadius: '12px' }}>
+          <div style={{ padding: '10px 16px', background: 'rgba(251,146,60,0.05)', borderBottom: '1px solid rgba(251,146,60,0.12)', borderRadius: '12px 12px 0 0' }}>
+            <span style={{ color: '#fb923c', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.15em' }}>CONTROL DE ESCENA</span>
+          </div>
+          <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {rounds.length === 0 && (
               <p style={{ color: 'rgba(255,255,255,0.3)', padding: '20px', textAlign: 'center', fontSize: '0.85rem' }}>No hay participantes.</p>
             )}
@@ -1474,11 +1599,13 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
                     const cCollapsed = !!collapsedCats[cKey];
                     return (
                     <div key={cat}>
-                      <div onClick={() => toggleCat(cKey)} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: cCollapsed ? 0 : '4px', paddingLeft: '4px', cursor: 'pointer', userSelect: 'none' }}>
-                        <span style={{ color: categoryColor(cat), fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{cat === '—' ? 'Sin categoría' : cat}</span>
-                        <span style={{ flex: 1, height: '1px', background: `${categoryColor(cat)}22` }} />
-                        <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>{cps.length}</span>
-                        <span style={{ color: `${categoryColor(cat)}88`, fontSize: '0.6rem', marginLeft: '2px' }}>{cCollapsed ? '▶' : '▼'}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: cCollapsed ? 0 : '4px', paddingLeft: '4px' }}>
+                        <div onClick={() => toggleCat(cKey)} style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0, cursor: 'pointer', userSelect: 'none' }}>
+                          <span style={{ color: categoryColor(cat), fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{cat === '—' ? 'Sin categoría' : cat}</span>
+                          <span style={{ flex: 1, height: '1px', background: `${categoryColor(cat)}22` }} />
+                          <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem' }}>{cps.length}</span>
+                          <span style={{ color: `${categoryColor(cat)}88`, fontSize: '0.6rem', marginLeft: '2px' }}>{cCollapsed ? '▶' : '▼'}</span>
+                        </div>
                       </div>
                       {!cCollapsed && <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                       {cps.map(p => {
@@ -1570,16 +1697,35 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
               });
             })()}
           </div>
-        </div>
+        </div>{/* end frame */}
 
         {/* Messaging to staff */}
-        <div style={{ borderTop: '1px solid #1a1a2e', paddingTop: '16px' }}>
-          <SpeakerMsgPanel tournamentId={tournamentId} thread={staffThread} onAdd={onStaffAdd} />
+        <div style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '12px' }}>
+          <div style={{ padding: '10px 16px', background: 'rgba(126,207,255,0.04)', borderBottom: '1px solid rgba(126,207,255,0.1)', borderRadius: '12px 12px 0 0' }}>
+            <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.15em' }}>COMUNICACIÓN</span>
+          </div>
+          <div style={{ padding: '16px' }}>
+            <SpeakerMsgPanel tournamentId={tournamentId} thread={staffThread} onAdd={onStaffAdd} />
+          </div>
         </div>
+
+        {/* Collapse / expand toggle */}
+        <button
+          onClick={() => setIframeCollapsed(c => !c)}
+          title={iframeCollapsed ? 'Mostrar pantalla pública' : 'Ocultar pantalla pública'}
+          style={{
+            position: 'sticky', bottom: '16px', alignSelf: 'flex-end',
+            background: 'rgba(126,207,255,0.08)', border: '1px solid rgba(126,207,255,0.2)',
+            color: '#7ecfff', borderRadius: '6px', padding: '5px 10px',
+            cursor: 'pointer', fontSize: '0.72rem', letterSpacing: '0.08em',
+          }}
+        >
+          {iframeCollapsed ? '◀ Pantalla' : 'Pantalla ▶'}
+        </button>
       </div>
 
       {/* ── Right: public screen preview ── */}
-      <div style={{ flex: 1, minWidth: 0, background: '#000', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ flex: iframeCollapsed ? 0 : 1, minWidth: 0, width: iframeCollapsed ? 0 : undefined, background: '#000', position: 'relative', overflow: 'hidden', transition: 'flex 0.25s ease' }}>
         <div style={{ position: 'absolute', top: '10px', right: '12px', zIndex: 10, display: 'flex', gap: '6px', alignItems: 'center' }}>
           <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: '0.62rem', letterSpacing: '0.14em', padding: '3px 8px', background: 'rgba(0,0,0,0.6)', borderRadius: '4px' }}>PANTALLA PÚBLICA</span>
           <button onClick={() => window.open(`/coreo-screen/${tournamentId}`, '_blank')} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid #2a2a3e', color: '#666', fontSize: '0.62rem', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}>⤢ Abrir</button>
@@ -1589,15 +1735,32 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
           style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
           title="Pantalla pública"
         />
-        {/* EN ESCENA AHORA overlay */}
-        {onStageP?.on_stage_at && elapsedS !== null && (
+        {/* EN ESCENA AHORA overlay — visible while any participant is on stage, disappears only on LIMPIAR */}
+        {onStageP && (
           <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 70%, transparent 100%)', padding: '18px 20px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
               <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.58rem', letterSpacing: '0.2em', marginBottom: '3px' }}>EN ESCENA AHORA</div>
               <div style={{ color: '#fff', fontWeight: 700, fontSize: '1rem', lineHeight: 1.2 }}>{onStageP.name}</div>
               <div style={{ color: categoryColor(onStageP.category), fontSize: '0.65rem', letterSpacing: '0.1em', marginTop: '3px' }}>{onStageP.category}</div>
+              {judgesList.length > 0 && (
+                <div style={{ display: 'flex', gap: '5px', marginTop: '8px' }}>
+                  {judgesList.map(j => {
+                    const voted = judgesVotedMap[onStageP.id]?.has(j.id);
+                    return (
+                      <div key={j.id} title={j.name} style={{
+                        width: '8px', height: '8px', borderRadius: '50%',
+                        background: voted ? '#34d399' : 'rgba(255,255,255,0.2)',
+                        border: voted ? '1px solid #34d399' : '1px solid rgba(255,255,255,0.3)',
+                        transition: 'background 0.3s',
+                      }} />
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div style={{ color: '#7ecfff', fontFamily: 'monospace', fontSize: '2.2rem', fontWeight: 700, lineHeight: 1 }}>{fmtTimer(elapsedS)}</div>
+            <div style={{ color: elapsedS !== null ? '#7ecfff' : 'rgba(255,255,255,0.25)', fontFamily: 'monospace', fontSize: '2.2rem', fontWeight: 700, lineHeight: 1 }}>
+              {elapsedS !== null ? fmtTimer(elapsedS) : '––:––'}
+            </div>
           </div>
         )}
       </div>
@@ -1639,7 +1802,7 @@ function OrganizerLogin({ onLogin }) {
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <form onSubmit={handleSubmit} className="card" style={{ width: '100%', maxWidth: '380px' }}>
-        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>ZEN TAISEN</p>
+        <p style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.5rem', letterSpacing: '0.25em', color: '#7ecfff', marginBottom: '2px' }}>ZEN.TAISEN</p>
         <h2 style={{ marginBottom: '8px', color: '#a78bfa', fontSize: '0.85rem', letterSpacing: '0.2em' }}>ORGANIZADOR</h2>
         <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', marginBottom: '16px' }}>Introduce tu código de acceso</p>
         <input
@@ -1735,6 +1898,7 @@ function ScoresTab({ tournamentId, scoresRefreshTick }) {
   const thBase = { padding: '8px 10px', color: 'rgba(255,255,255,0.4)', fontWeight: 400, whiteSpace: 'nowrap', borderBottom: '1px solid #1a1a2e', fontSize: '0.75rem' };
   const thRight = { ...thBase, textAlign: 'right' };
   const JUDGE_COLORS = ['#7ecfff', '#a78bfa', '#34d399', '#fb923c', '#f472b6', '#facc15'];
+  const PODIUM = ['#fbbf24', '#94a3b8', '#cd7f32']; // gold, silver, bronze
 
   return (
     <div>
@@ -1762,7 +1926,10 @@ function ScoresTab({ tournamentId, scoresRefreshTick }) {
                 </div>
                 {catComplete && (
                   <button
-                    onClick={() => sendCategoryRanking(round, cat, catParts)}
+                    onClick={() => {
+                      if (!window.confirm(`¿Enviar el ranking de "${cat}" al staff? Esto mostrará el Top 3 en su panel.`)) return;
+                      sendCategoryRanking(round, cat, catParts);
+                    }}
                     disabled={sendingRanking[rankKey]}
                     style={{ marginLeft: 'auto', background: 'rgba(126,207,255,0.08)', border: '1px solid rgba(126,207,255,0.3)', color: '#7ecfff', padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.05em' }}>
                     {sendingRanking[rankKey] ? '...' : '🏆 Enviar ranking'}
@@ -1799,10 +1966,16 @@ function ScoresTab({ tournamentId, scoresRefreshTick }) {
                   <tbody>
                     {catParts.map((p, idx) => {
                       const total = p.globalAvg;
+                      const podiumColor = idx < 3 && total != null ? PODIUM[idx] : null;
+                      const rowBg = podiumColor
+                        ? `${podiumColor}0d`
+                        : idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
                       return (
-                        <tr key={p.id} style={{ borderBottom: '1px solid #1a1a2e', background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent' }}>
-                          <td style={{ padding: '10px 10px', color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem' }}>{idx + 1}</td>
-                          <td style={{ padding: '10px 10px', color: '#fff', fontWeight: 500 }}>{p.name}</td>
+                        <tr key={p.id} style={{ borderBottom: '1px solid #1a1a2e', background: rowBg }}>
+                          <td style={{ padding: '10px 10px', color: podiumColor ?? 'rgba(255,255,255,0.25)', fontSize: '0.75rem', fontWeight: podiumColor ? 700 : 400 }}>
+                            {podiumColor ? ['🥇','🥈','🥉'][idx] : idx + 1}
+                          </td>
+                          <td style={{ padding: '10px 10px', color: podiumColor ?? '#fff', fontWeight: podiumColor ? 700 : 500 }}>{p.name}</td>
                           {judges.map((j, ji) =>
                             criteria.map((c, ci) => {
                               const val = p.judgeScores?.[j.id]?.[c.id];
@@ -1813,7 +1986,7 @@ function ScoresTab({ tournamentId, scoresRefreshTick }) {
                               );
                             })
                           )}
-                          <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, borderLeft: '2px solid rgba(126,207,255,0.1)', color: total != null ? (p.allVoted ? '#7ecfff' : '#ef4444') : 'rgba(255,255,255,0.15)' }}>
+                          <td style={{ padding: '10px 10px', textAlign: 'right', fontWeight: 700, borderLeft: '2px solid rgba(126,207,255,0.1)', color: total != null ? (podiumColor ?? (p.allVoted ? '#7ecfff' : '#ef4444')) : 'rgba(255,255,255,0.15)' }}>
                             {total != null ? total.toFixed(2) : '—'}
                           </td>
                         </tr>
@@ -1997,7 +2170,7 @@ export default function CoreoAdmin() {
       {/* Header */}
       <div style={{ background: '#111', borderBottom: '1px solid #1a1a2e', padding: '14px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.3rem', letterSpacing: '0.25em', color: '#7ecfff' }}>ZEN TAISEN</span>
+          <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.3rem', letterSpacing: '0.25em', color: '#7ecfff' }}>ZEN.TAISEN</span>
           <span style={{ color: 'rgba(255,255,255,0.4)', marginLeft: '12px', fontSize: '0.85rem' }}>{tournament.name}</span>
           <span style={{ marginLeft: '8px', fontSize: '0.7rem', color: '#7ecfff', border: '1px solid rgba(126,207,255,0.3)', borderRadius: '4px', padding: '2px 8px', letterSpacing: '0.1em' }}>COREO</span>
           {tournament.status === 'setup' && (
@@ -2058,7 +2231,7 @@ export default function CoreoAdmin() {
               color: isActive ? color : t.accent ? 'rgba(251,146,60,0.5)' : 'rgba(255,255,255,0.4)',
               borderBottom: isActive ? `2px solid ${color}` : '2px solid transparent',
               transition: 'all 0.15s',
-              marginLeft: t.accent ? 'auto' : undefined,
+              marginLeft: undefined,
             }}>
               {t.label}
             </button>
@@ -2076,6 +2249,15 @@ export default function CoreoAdmin() {
       {/* Config tab: also full-width outside the narrow container */}
       {activeTab === 'config' && (
         <div style={{ padding: '28px 48px', maxWidth: '1400px', margin: '0 auto', width: '100%', boxSizing: 'border-box' }}>
+          {isAdmin && tournament.status === 'setup' && (
+            <SetupChecklist
+              criteria={criteria}
+              categories={parsedCategories}
+              participants={participants}
+              judges={judges}
+              onNavigate={setTab}
+            />
+          )}
           <ConfigTab
             tournamentId={Number(id)}
             criteria={criteria}
