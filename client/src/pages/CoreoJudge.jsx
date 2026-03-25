@@ -305,12 +305,16 @@ function JudgePanel({ judge, onLogout }) {
       setOnStageAt(null);
       setFrozenElapsedS(on_stage_duration_s ?? null);
     });
+    socket.on('coreo:round-changed', ({ participants: newParts }) => {
+      setState(prev => prev ? { ...prev, participants: newParts } : prev);
+    });
     return () => {
       socket.off('connect', join);
       socket.off('coreo:on-stage');
       socket.off('coreo:off-stage');
       socket.off('coreo:timer-started');
       socket.off('coreo:timer-stopped');
+      socket.off('coreo:round-changed');
     };
   }, [socket, judge]);
 

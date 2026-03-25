@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const fs = require('fs');
+const path = require('path');
 const db = require('../db');
 const { nanoid } = require('nanoid');
+const { uploadsDir } = require('../upload');
 const { generateWordCode } = require('../wordCode');
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
@@ -122,7 +125,22 @@ router.get('/tournaments/:id', (req, res) => {
 });
 
 router.delete('/tournaments/:id', (req, res) => {
-  db.prepare('DELETE FROM tournaments WHERE id = ?').run(Number(req.params.id));
+  const tid = Number(req.params.id);
+
+  // Collect image paths before deleting from DB
+  const tournament = db.prepare('SELECT poster_path FROM tournaments WHERE id = ?').get(tid);
+  const participants = db.prepare('SELECT photo_path FROM participants WHERE tournament_id = ? AND photo_path IS NOT NULL').all(tid);
+
+  db.prepare('DELETE FROM tournaments WHERE id = ?').run(tid);
+
+  // Delete files from disk
+  const filesToDelete = [];
+  if (tournament?.poster_path) filesToDelete.push(tournament.poster_path);
+  for (const p of participants) filesToDelete.push(p.photo_path);
+  for (const filename of filesToDelete) {
+    try { fs.unlinkSync(path.join(uploadsDir, filename)); } catch (_) {}
+  }
+
   res.json({ success: true });
 });
 
@@ -1149,7 +1167,8 @@ router.post('/tournaments/:id/timer/start', (req, res) => {
   if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
 
   let durationS;
-  if (tournament.timer_status === 'paused' && tournament.timer_remaining_s != null) {
+  const isResume = tournament.timer_status === 'paused' && tournament.timer_remaining_s != null;
+  if (isResume) {
     // Resume from where it was paused
     durationS = tournament.timer_remaining_s;
   } else {
@@ -1158,8 +1177,14 @@ router.post('/tournaments/:id/timer/start', (req, res) => {
   }
 
   const now = Date.now();
-  db.prepare('UPDATE tournaments SET timer_status = ?, timer_start_at = ?, timer_remaining_s = ? WHERE id = ?')
-    .run('running', now, durationS, tid);
+  if (!isResume && req.body.duration_s) {
+    // Persist chosen duration as new default for subsequent battles
+    db.prepare('UPDATE tournaments SET timer_status = ?, timer_start_at = ?, timer_remaining_s = ?, timer_duration_s = ? WHERE id = ?')
+      .run('running', now, durationS, durationS, tid);
+  } else {
+    db.prepare('UPDATE tournaments SET timer_status = ?, timer_start_at = ?, timer_remaining_s = ? WHERE id = ?')
+      .run('running', now, durationS, tid);
+  }
   const state = getTimerState(tid);
   req.io.to(`screen:${tid}`).emit('timer:update', state);
   req.io.to(`admin:${tid}`).emit('timer:update', state);

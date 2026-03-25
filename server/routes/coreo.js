@@ -46,13 +46,15 @@ router.post('/speaker-login', (req, res) => {
     WHERE s.access_code = ? AND t.tournament_type = 'coreografia'
   `).get(code.trim());
   if (!speaker) return res.status(401).json({ error: 'Código no válido' });
+  const tournamentRow = db.prepare('SELECT current_round FROM tournaments WHERE id = ?').get(speaker.tournament_id);
   const tournament = { id: speaker.tournament_id, name: speaker.tournament_name, status: speaker.status, started_at: speaker.started_at };
+  const round = tournamentRow?.current_round || 1;
   const participants = db.prepare(`
     SELECT id, name, category, age_group, photo_path, act_order, on_stage, round_number,
            on_stage_at, on_stage_duration_s
-    FROM participants WHERE tournament_id = ?
-    ORDER BY COALESCE(round_number, 1), COALESCE(act_order, 9999), id
-  `).all(tournament.id);
+    FROM participants WHERE tournament_id = ? AND COALESCE(round_number, 1) = ?
+    ORDER BY COALESCE(act_order, 9999), id
+  `).all(tournament.id, round);
   res.json({ speaker: { id: speaker.id, name: speaker.name }, tournament, participants });
 });
 
@@ -95,11 +97,12 @@ router.get('/tournaments/:id', (req, res) => {
 
   const criteria = db.prepare('SELECT * FROM criteria WHERE tournament_id = ? ORDER BY sort_order').all(tid);
 
+  const roundFilter = req.query.round ? Number(req.query.round) : (tournament.current_round || 1);
   const participants = db.prepare(`
     SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number,
            on_stage_at, on_stage_duration_s
-    FROM participants WHERE tournament_id = ? ORDER BY COALESCE(act_order, 9999), id
-  `).all(tid);
+    FROM participants WHERE tournament_id = ? AND COALESCE(round_number, 1) = ? ORDER BY COALESCE(act_order, 9999), id
+  `).all([tid, roundFilter]);
 
   for (const p of participants) {
     p.members = db.prepare('SELECT member_name FROM participant_members WHERE participant_id = ? ORDER BY sort_order').all(p.id).map(r => r.member_name);
@@ -150,13 +153,12 @@ router.delete('/tournaments/:id/poster', (req, res) => {
 // ── PUT /api/coreo/tournaments/:id/config ────────────────────────────────────
 router.put('/tournaments/:id/config', (req, res) => {
   const tid = Number(req.params.id);
-  const { categories, rounds } = req.body;
-  const cats = Array.isArray(categories) ? JSON.stringify(categories.map(String)) : '[]';
+  const { rounds } = req.body;
   const rds = Math.max(1, Number(rounds) || 1);
-  db.prepare('UPDATE tournaments SET coreo_categories = ?, coreo_rounds = ? WHERE id = ?').run(cats, rds, tid);
-  const updated = db.prepare('SELECT coreo_categories, coreo_rounds FROM tournaments WHERE id = ?').get(tid);
-  req.io.to(`admin:${tid}`).emit('coreo:config-updated', { coreo_categories: updated.coreo_categories, coreo_rounds: updated.coreo_rounds });
-  res.json({ success: true, coreo_categories: updated.coreo_categories, coreo_rounds: updated.coreo_rounds });
+  db.prepare('UPDATE tournaments SET coreo_rounds = ? WHERE id = ?').run(rds, tid);
+  const updated = db.prepare('SELECT coreo_rounds FROM tournaments WHERE id = ?').get(tid);
+  req.io.to(`admin:${tid}`).emit('coreo:config-updated', { coreo_rounds: updated.coreo_rounds });
+  res.json({ success: true, coreo_rounds: updated.coreo_rounds });
 });
 
 // ── PUT /api/coreo/tournaments/:id/criteria ─────────────────────────────────
@@ -284,6 +286,42 @@ router.put('/tournaments/:id/act-order', (req, res) => {
 
   req.io.to(`admin:${tid}`).emit('coreo:order-updated', { order });
   res.json({ success: true });
+});
+
+// ── PUT /api/coreo/tournaments/:id/block-structure ────────────────────────────
+router.put('/tournaments/:id/block-structure', (req, res) => {
+  const tid = Number(req.params.id);
+  const { block_structure, categories } = req.body;
+  if (!Array.isArray(block_structure)) return res.status(400).json({ error: 'block_structure debe ser un array' });
+
+  // Derive categories from block structure if not explicitly provided
+  const allCats = categories ?? [...new Set(block_structure.flatMap(b => b.categories || []))];
+  const catsJson = JSON.stringify(allCats);
+
+  db.prepare('UPDATE tournaments SET block_structure = ?, coreo_categories = ? WHERE id = ?')
+    .run(JSON.stringify(block_structure), catsJson, tid);
+
+  const coreo_rounds = db.prepare('SELECT coreo_rounds FROM tournaments WHERE id = ?').get(tid)?.coreo_rounds;
+  req.io.to(`admin:${tid}`).emit('coreo:config-updated', { coreo_categories: allCats, coreo_rounds, block_structure });
+  res.json({ block_structure, coreo_categories: allCats });
+});
+
+// ── POST /api/coreo/tournaments/:id/advance-round ─────────────────────────────
+router.post('/tournaments/:id/advance-round', (req, res) => {
+  const tid = Number(req.params.id);
+  const { round } = req.body;
+  if (!round || round < 1) return res.status(400).json({ error: 'round inválido' });
+
+  db.prepare('UPDATE tournaments SET current_round = ? WHERE id = ?').run(Number(round), tid);
+
+  const participants = db.prepare(`
+    SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number,
+           on_stage_at, on_stage_duration_s
+    FROM participants WHERE tournament_id = ? AND COALESCE(round_number, 1) = ? ORDER BY COALESCE(act_order, 9999), id
+  `).all(tid, Number(round));
+
+  req.io.to(`admin:${tid}`).to(`coreo-speaker:${tid}`).to(`judge:${tid}`).emit('coreo:round-changed', { round: Number(round), participants });
+  res.json({ round: Number(round), participants });
 });
 
 // ── Timing helper ─────────────────────────────────────────────────────────────
@@ -538,10 +576,11 @@ router.get('/tournaments/:id/scores/summary', (req, res) => {
 // ── GET /api/coreo/tournaments/:id/timing ────────────────────────────────────
 router.get('/tournaments/:id/timing', requireAdmin, (req, res) => {
   const tid = Number(req.params.id);
-  const t = db.prepare('SELECT started_at, status FROM tournaments WHERE id = ?').get(tid);
+  const t = db.prepare('SELECT started_at, status, current_round FROM tournaments WHERE id = ?').get(tid);
+  const round = t?.current_round || 1;
   const participants = db.prepare(
-    'SELECT id, name, category, round_number, act_order, on_stage, on_stage_at, on_stage_duration_s FROM participants WHERE tournament_id = ? ORDER BY COALESCE(act_order, 9999), id'
-  ).all(tid);
+    'SELECT id, name, category, round_number, act_order, on_stage, on_stage_at, on_stage_duration_s FROM participants WHERE tournament_id = ? AND COALESCE(round_number, 1) = ? ORDER BY COALESCE(act_order, 9999), id'
+  ).all(tid, round);
   res.json({ started_at: t?.started_at, status: t?.status, participants });
 });
 

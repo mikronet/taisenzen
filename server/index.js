@@ -109,11 +109,33 @@ async function start() {
 
   setupSocket(io);
 
+  // Global Express error handler — catches any error passed to next(err) or thrown sync in routes
+  // eslint-disable-next-line no-unused-vars
+  app.use((err, req, res, next) => {
+    console.error(`[ERROR] ${req.method} ${req.path}:`, err.message || err);
+    if (res.headersSent) return;
+    // Multer file type errors
+    if (err.message && err.message.includes('Tipo de archivo no permitido')) {
+      return res.status(400).json({ error: err.message });
+    }
+    res.status(500).json({ error: 'Error interno del servidor' });
+  });
+
   const PORT = process.env.PORT || 3000;
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`Battle App running on port ${PORT}`);
   });
 }
+
+// Prevent crashes from uncaught sync errors outside route handlers
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] uncaughtException:', err);
+  // db.saveSync() will be called by the process 'exit' handler in db.js
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] unhandledRejection:', reason);
+});
 
 start().catch(err => {
   console.error('Failed to start:', err);

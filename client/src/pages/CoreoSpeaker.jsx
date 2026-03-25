@@ -173,12 +173,18 @@ function SpeakerPanel({ tournament, participants: initialParticipants, speakerNa
     });
     socket.on('coreo:speaker-update', addIncoming);
     socket.on('coreo:timing-updated', setTiming);
+    socket.on('coreo:round-changed', ({ participants: newParts }) => {
+      setParticipants(newParts);
+      setOnStageId(newParts.find(p => p.on_stage)?.id ?? null);
+      setTiming(prev => ({ ...prev, participants: newParts }));
+    });
     return () => {
       socket.off('connect', join);
       socket.off('coreo:on-stage');
       socket.off('coreo:off-stage');
       socket.off('coreo:speaker-update', addIncoming);
       socket.off('coreo:timing-updated', setTiming);
+      socket.off('coreo:round-changed');
     };
   }, [socket, tournamentId, addIncoming]);
 

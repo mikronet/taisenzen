@@ -334,33 +334,6 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
   const [configSaved, setConfigSaved] = useState(false);
   const markConfigDirty = () => { setConfigDirty(true); setConfigSaved(false); };
 
-  // ── Categories ──
-  const parsedCats = (() => { try { return JSON.parse(tournament.coreo_categories || '[]'); } catch { return []; } })();
-  const [catList, setCatList] = useState(parsedCats);
-  const [newCat, setNewCat] = useState('');
-
-  useEffect(() => {
-    try { setCatList(JSON.parse(tournament.coreo_categories || '[]')); } catch { setCatList([]); }
-  }, [tournament.coreo_categories]);
-
-  const addCategory = (e) => {
-    e.preventDefault();
-    const v = newCat.trim();
-    if (!v || catList.includes(v)) return;
-    setCatList(prev => [...prev, v]);
-    setNewCat('');
-    markConfigDirty();
-  };
-  const removeCategory = (idx) => { setCatList(prev => prev.filter((_, i) => i !== idx)); markConfigDirty(); };
-  const moveCategoryItem = (idx, dir) => {
-    const next = [...catList];
-    const swap = idx + dir;
-    if (swap < 0 || swap >= next.length) return;
-    [next[idx], next[swap]] = [next[swap], next[idx]];
-    setCatList(next);
-    markConfigDirty();
-  };
-
   // ── Rounds ──
   const [rounds, setRounds] = useState(tournament.coreo_rounds || 1);
   useEffect(() => { setRounds(tournament.coreo_rounds || 1); }, [tournament.coreo_rounds]);
@@ -371,11 +344,11 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
     setSavingConfig(true);
     try {
       const res = await apiFetch(`${API}/tournaments/${tournamentId}/config`, {
-        method: 'PUT', body: JSON.stringify({ categories: catList, rounds }),
+        method: 'PUT', body: JSON.stringify({ rounds }),
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      onUpdateTournament({ coreo_categories: data.coreo_categories, coreo_rounds: data.coreo_rounds });
+      onUpdateTournament({ coreo_rounds: data.coreo_rounds });
       setConfigDirty(false); setConfigSaved(true);
     } finally { setSavingConfig(false); }
   };
@@ -400,15 +373,16 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
       {/* ── Left column: event config ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {/* Frame 1: Bloques + Categorías */}
+        {/* Frame 1: Bloques */}
         <div style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
           <div style={{ padding: '12px 20px', background: 'rgba(126,207,255,0.04)', borderBottom: '1px solid rgba(126,207,255,0.1)' }}>
-            <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.15em' }}>BLOQUES Y CATEGORÍAS</span>
+            <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.15em' }}>BLOQUES</span>
           </div>
           <div style={{ padding: '20px' }}>
-            {/* Rounds */}
             <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>NÚMERO DE BLOQUES</h3>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Los participantes se asignan a un bloque. El orden de actuación se agrupa: Bloque → Categoría → Participante.</p>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>
+              Define cuántos bloques tiene el evento. Las categorías se asignan a cada bloque desde la pestaña <strong style={{ color: 'rgba(255,255,255,0.7)' }}>PARTICIPANTES</strong>.
+            </p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <input
                 type="number" min={1} max={20}
@@ -420,37 +394,11 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
                 {rounds === 1 ? '1 bloque' : `${rounds} bloques`}
               </span>
             </div>
-
-            <hr style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.07)', margin: '24px 0' }} />
-
-            {/* Categories */}
-            <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CATEGORÍAS</h3>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Crea las categorías de este evento. El orden aquí determina el orden en los desplegables.</p>
-            <form onSubmit={addCategory} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <input
-                placeholder="Nueva categoría (ej: Solo, Parejas, Grupo...)"
-                value={newCat}
-                onChange={e => setNewCat(e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <button type="submit" className="btn-secondary">+ Añadir</button>
-            </form>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
-              {catList.length === 0 && <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>Sin categorías definidas.</p>}
-              {catList.map((cat, i) => (
-                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'rgba(255,255,255,0.03)', borderRadius: '6px', padding: '10px 14px' }}>
-                  <span style={{ flex: 1, color: categoryColor(cat), fontWeight: 600, fontSize: '0.95rem' }}>{cat}</span>
-                  <button onClick={() => moveCategoryItem(i, -1)} disabled={i === 0} style={{ background: 'none', border: '1px solid #333', color: i === 0 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '4px 9px', cursor: i === 0 ? 'default' : 'pointer', fontSize: '0.85rem' }}>↑</button>
-                  <button onClick={() => moveCategoryItem(i, 1)} disabled={i === catList.length - 1} style={{ background: 'none', border: '1px solid #333', color: i === catList.length - 1 ? '#2a2a2a' : '#888', borderRadius: '4px', padding: '4px 9px', cursor: i === catList.length - 1 ? 'default' : 'pointer', fontSize: '0.85rem' }}>↓</button>
-                  <button onClick={() => removeCategory(i)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '4px 9px', cursor: 'pointer', fontSize: '0.85rem' }}>✕</button>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
               <button onClick={saveConfig} className="btn-primary" disabled={savingConfig}>
-                {savingConfig ? 'Guardando...' : 'Guardar categorías y bloques'}
+                {savingConfig ? 'Guardando...' : 'Guardar bloques'}
               </button>
-              <SaveStatus dirty={configDirty} saved={configSaved} savedMsg="Categorías y bloques guardados" />
+              <SaveStatus dirty={configDirty} saved={configSaved} savedMsg="Bloques guardados" />
             </div>
           </div>
         </div>
@@ -627,7 +575,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
 }
 
 // ── Participant form ───────────────────────────────────────────────────────────
-function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, roundsCount }) {
+function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, roundsCount, context }) {
   const [name, setName] = useState(initial?.name || '');
   const [category, setCategory] = useState(initial?.category || '');
   const [roundNumber, setRoundNumber] = useState(initial?.round_number || 1);
@@ -654,8 +602,9 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
     try {
       const fd = new FormData();
       fd.append('name', name.trim());
-      fd.append('category', category);
-      fd.append('round_number', roundNumber);
+      // If context is provided, use it; otherwise use the form state
+      fd.append('category', context ? context.category : category);
+      fd.append('round_number', context ? context.round_number : roundNumber);
       fd.append('academia', academia.trim());
       fd.append('localidad', localidad.trim());
       fd.append('coreografo', coreografo.trim());
@@ -680,7 +629,16 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Row 1: photo + name + category + round */}
+      {/* Context badge — shown when category/block are pre-set */}
+      {context && (
+        <div style={{ padding: '8px 12px', background: 'rgba(126,207,255,0.07)', borderRadius: '6px', marginBottom: '2px', fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)' }}>
+          <span style={{ color: '#7ecfff', fontWeight: 600 }}>Bloque {context.round_number}</span>
+          <span style={{ margin: '0 6px', opacity: 0.3 }}>›</span>
+          <span style={{ color: '#fff' }}>{context.category}</span>
+        </div>
+      )}
+
+      {/* Row 1: photo + name + (category + round only if no context) */}
       <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
         <div
           onClick={() => fileRef.current.click()}
@@ -694,17 +652,19 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
         </div>
         <div style={{ flex: 1, minWidth: '200px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           <input placeholder="Nombre del grupo *" value={name} onChange={e => setName(e.target.value)} />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <select value={category} onChange={e => setCategory(e.target.value)} style={{ flex: 1 }}>
-              <option value="">Categoría</option>
-              {(categories || []).map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select value={roundNumber} onChange={e => setRoundNumber(Number(e.target.value))} style={{ flex: 1 }}>
-              {Array.from({ length: rounds }, (_, i) => i + 1).map(r => (
-                <option key={r} value={r}>Bloque {r}</option>
-              ))}
-            </select>
-          </div>
+          {!context && (
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <select value={category} onChange={e => setCategory(e.target.value)} style={{ flex: 1 }}>
+                <option value="">Categoría</option>
+                {(categories || []).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <select value={roundNumber} onChange={e => setRoundNumber(Number(e.target.value))} style={{ flex: 1 }}>
+                {Array.from({ length: rounds }, (_, i) => i + 1).map(r => (
+                  <option key={r} value={r}>Bloque {r}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -735,76 +695,316 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
   );
 }
 
+// ── Block Structure Editor ─────────────────────────────────────────────────────
+function BlockStructureEditor({ tournamentId, roundsCount, initialStructure, onSaved }) {
+  const makeEmpty = () => Array.from({ length: roundsCount }, (_, i) => ({ round: i + 1, categories: [] }));
+
+  const [blocks, setBlocks] = useState(() =>
+    initialStructure && initialStructure.length > 0 ? initialStructure : makeEmpty()
+  );
+  const [newCatInputs, setNewCatInputs] = useState(() => Array.from({ length: roundsCount }, () => ''));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // All category names across all blocks (for duplicate detection)
+  const allCatNames = blocks.flatMap(b => b.categories);
+
+  const moveCatUp = (bi, ci) => {
+    if (ci === 0) return;
+    setBlocks(prev => prev.map((b, i) => i !== bi ? b : {
+      ...b, categories: [...b.categories.slice(0, ci-1), b.categories[ci], b.categories[ci-1], ...b.categories.slice(ci+1)]
+    }));
+    setSaved(false);
+  };
+  const moveCatDown = (bi, ci) => {
+    setBlocks(prev => prev.map((b, i) => {
+      if (i !== bi) return b;
+      const cats = [...b.categories];
+      if (ci >= cats.length - 1) return b;
+      [cats[ci], cats[ci+1]] = [cats[ci+1], cats[ci]];
+      return { ...b, categories: cats };
+    }));
+    setSaved(false);
+  };
+  const removeCat = (bi, ci) => {
+    setBlocks(prev => prev.map((b, i) => i !== bi ? b : {
+      ...b, categories: b.categories.filter((_, j) => j !== ci)
+    }));
+    setSaved(false);
+  };
+  const addCatToBlock = (bi, e) => {
+    e.preventDefault();
+    const val = newCatInputs[bi].trim();
+    if (!val || allCatNames.includes(val)) return;
+    setBlocks(prev => prev.map((b, i) => i !== bi ? b : { ...b, categories: [...b.categories, val] }));
+    setNewCatInputs(prev => prev.map((v, i) => i !== bi ? v : ''));
+    setSaved(false);
+  };
+
+  const handleSave = async () => {
+    const allCats = [...new Set(blocks.flatMap(b => b.categories))];
+    setSaving(true);
+    try {
+      const res = await apiFetch(`/api/coreo/tournaments/${tournamentId}/block-structure`, {
+        method: 'PUT',
+        body: JSON.stringify({ block_structure: blocks, categories: allCats }),
+      });
+      if (res.ok) { setSaved(true); onSaved(blocks, allCats); }
+    } finally { setSaving(false); }
+  };
+
+  const hasCategories = blocks.some(b => b.categories.length > 0);
+
+  return (
+    <div>
+      <div style={{ marginBottom: '20px' }}>
+        <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: '0 0 6px' }}>ESTRUCTURA DE BLOQUES</h3>
+        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>
+          Crea las categorías de cada bloque y ordénalas. Una vez guardado, podrás introducir participantes categoría por categoría.
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+        {blocks.map((block, bi) => (
+          <div key={block.round} style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '10px', overflow: 'hidden' }}>
+            <div style={{ padding: '10px 16px', background: 'rgba(126,207,255,0.07)' }}>
+              <span style={{ color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", fontSize: '1rem', letterSpacing: '0.2em' }}>
+                BLOQUE {block.round}
+                <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.7rem', fontFamily: 'inherit', marginLeft: '8px' }}>
+                  {block.categories.length} {block.categories.length === 1 ? 'categoría' : 'categorías'}
+                </span>
+              </span>
+            </div>
+            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {block.categories.length === 0 && (
+                <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.78rem', margin: '4px 0', fontStyle: 'italic' }}>Sin categorías — añade la primera abajo</p>
+              )}
+              {block.categories.map((cat, ci) => (
+                <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#0f0f1a', borderRadius: '6px', padding: '7px 12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
+                    <button onClick={() => moveCatUp(bi, ci)} disabled={ci === 0} style={{ background: 'none', border: '1px solid #333', color: ci === 0 ? '#1a1a2e' : '#aaa', borderRadius: '3px', padding: '1px 6px', cursor: ci === 0 ? 'default' : 'pointer', fontSize: '0.75rem', lineHeight: 1 }}>↑</button>
+                    <button onClick={() => moveCatDown(bi, ci)} disabled={ci === block.categories.length - 1} style={{ background: 'none', border: '1px solid #333', color: ci === block.categories.length - 1 ? '#1a1a2e' : '#aaa', borderRadius: '3px', padding: '1px 6px', cursor: ci === block.categories.length - 1 ? 'default' : 'pointer', fontSize: '0.75rem', lineHeight: 1 }}>↓</button>
+                  </div>
+                  <span style={{ flex: 1, fontSize: '0.88rem', color: '#fff' }}>{cat}</span>
+                  <button onClick={() => removeCat(bi, ci)} style={{ background: 'none', border: '1px solid #333', color: '#666', borderRadius: '4px', padding: '3px 8px', cursor: 'pointer', fontSize: '0.75rem' }}>✕</button>
+                </div>
+              ))}
+              <form onSubmit={(e) => addCatToBlock(bi, e)} style={{ display: 'flex', gap: '6px', marginTop: '4px' }}>
+                <input
+                  placeholder="Nueva categoría (ej: Solo, Parejas, Grupo...)"
+                  value={newCatInputs[bi]}
+                  onChange={e => setNewCatInputs(prev => prev.map((v, i) => i !== bi ? v : e.target.value))}
+                  style={{ flex: 1, fontSize: '0.82rem', padding: '6px 10px' }}
+                />
+                <button type="submit" className="btn-secondary" style={{ fontSize: '0.78rem', padding: '6px 12px' }}>+ Añadir</button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button
+          className="btn-primary"
+          onClick={handleSave}
+          disabled={saving || !hasCategories}
+          title={!hasCategories ? 'Añade al menos una categoría' : ''}
+        >
+          {saving ? 'Guardando...' : saved ? '✓ Guardado' : 'Guardar estructura'}
+        </button>
+        {saved && (
+          <span style={{ color: '#34d399', fontSize: '0.78rem' }}>Estructura guardada — puedes comenzar a introducir participantes</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── PARTICIPANTS tab ──────────────────────────────────────────────────────────
-function ParticipantsTab({ tournamentId, participants, onUpdate, categories, roundsCount }) {
+function ParticipantsTab({ tournamentId, participants, onUpdate, categories, roundsCount, activeBlock, onBlockChange, totalBlocks, blockStructure, onBlockStructureSave }) {
+  // Parsed block structure
+  const parsedStructure = (() => {
+    try { return blockStructure ? JSON.parse(blockStructure) : null; } catch { return null; }
+  })();
+
+  const [editingStructure, setEditingStructure] = useState(!parsedStructure || parsedStructure.length === 0 || parsedStructure.every(b => b.categories.length === 0));
+  const [activeCategory, setActiveCategory] = useState(() => {
+    if (!parsedStructure) return null;
+    const block = parsedStructure.find(b => b.round === activeBlock);
+    return block?.categories[0] ?? null;
+  });
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
+  // When block changes, reset active category to first of new block
+  useEffect(() => {
+    if (!parsedStructure) return;
+    const block = parsedStructure.find(b => b.round === activeBlock);
+    setActiveCategory(block?.categories[0] ?? null);
+    setShowForm(false);
+    setEditing(null);
+  }, [activeBlock, blockStructure]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSave = (p) => {
-    if (editing) {
+    if (p.id && participants.find(x => x.id === p.id)) {
       onUpdate(participants.map(x => x.id === p.id ? p : x));
-      setEditing(null);
     } else {
       onUpdate([...participants, p]);
-      setShowForm(false);
     }
+    setShowForm(false);
+    setEditing(null);
   };
 
-  const remove = async (p) => {
-    if (!confirm(`¿Eliminar a "${p.name}"? Se borrará también su foto.`)) return;
+  const handleDelete = async (p) => {
+    if (!window.confirm(`¿Eliminar "${p.name}"?`)) return;
     await apiFetch(`${API}/participants/${p.id}`, { method: 'DELETE' });
     onUpdate(participants.filter(x => x.id !== p.id));
   };
 
+  // If no structure defined, show the editor
+  if (editingStructure || !parsedStructure) {
+    return (
+      <div>
+        <BlockStructureEditor
+          tournamentId={tournamentId}
+          roundsCount={roundsCount}
+          initialStructure={parsedStructure}
+          onSaved={(structure, cats) => {
+            onBlockStructureSave(structure, cats);
+            setEditingStructure(false);
+            const firstBlock = structure.find(b => b.round === activeBlock) || structure[0];
+            setActiveCategory(firstBlock?.categories[0] ?? null);
+          }}
+        />
+      </div>
+    );
+  }
+
+  const currentBlockDef = parsedStructure.find(b => b.round === activeBlock) || { round: activeBlock, categories: [] };
+  const blockCategories = currentBlockDef.categories;
+  const catIndex = blockCategories.indexOf(activeCategory);
+
+  // Flat navigation: all (block, cat) pairs in order
+  const allPairs = parsedStructure.flatMap(b => b.categories.map(c => ({ round: b.round, category: c })));
+  const currentPairIdx = allPairs.findIndex(p => p.round === activeBlock && p.category === activeCategory);
+  const prevPair = currentPairIdx > 0 ? allPairs[currentPairIdx - 1] : null;
+  const nextPair = currentPairIdx < allPairs.length - 1 ? allPairs[currentPairIdx + 1] : null;
+
+  const goToPrev = async () => {
+    if (!prevPair) return;
+    if (prevPair.round !== activeBlock) await onBlockChange(prevPair.round);
+    setActiveCategory(prevPair.category);
+    setShowForm(false); setEditing(null);
+  };
+  const goToNext = async () => {
+    if (!nextPair) return;
+    if (nextPair.round !== activeBlock) await onBlockChange(nextPair.round);
+    setActiveCategory(nextPair.category);
+    setShowForm(false); setEditing(null);
+  };
+
+  // Participants for current context
+  const catParticipants = participants.filter(p => p.category === activeCategory);
+  const context = activeCategory ? { round_number: activeBlock, category: activeCategory } : null;
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: 0 }}>PARTICIPANTES ({participants.length})</h3>
-        {!showForm && !editing && <button className="btn-primary" onClick={() => setShowForm(true)}>+ Añadir</button>}
+      {/* Block + category nav bar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
+        {/* Block nav */}
+        {totalBlocks > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 14px', background: 'rgba(126,207,255,0.04)', border: '1px solid rgba(126,207,255,0.1)', borderRadius: '8px' }}>
+            <button onClick={() => onBlockChange(activeBlock - 1)} disabled={activeBlock <= 1} style={{ background: 'none', border: '1px solid #333', color: activeBlock <= 1 ? '#1a1a2e' : '#666', borderRadius: '5px', padding: '4px 10px', cursor: activeBlock <= 1 ? 'default' : 'pointer', fontSize: '0.78rem' }}>←</button>
+            <span style={{ flex: 1, textAlign: 'center', color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", fontSize: '0.95rem', letterSpacing: '0.2em' }}>
+              BLOQUE {activeBlock} <span style={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'inherit', fontSize: '0.7rem' }}>de {totalBlocks}</span>
+            </span>
+            <button onClick={() => onBlockChange(activeBlock + 1)} disabled={activeBlock >= totalBlocks} style={{ background: 'none', border: '1px solid #333', color: activeBlock >= totalBlocks ? '#1a1a2e' : '#666', borderRadius: '5px', padding: '4px 10px', cursor: activeBlock >= totalBlocks ? 'default' : 'pointer', fontSize: '0.78rem' }}>→</button>
+          </div>
+        )}
+
+        {/* Category nav */}
+        {blockCategories.length > 0 ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#0f0f1a', border: '1px solid #1a1a2e', borderRadius: '8px' }}>
+            <button onClick={goToPrev} disabled={!prevPair} style={{ background: 'none', border: '1px solid #333', color: !prevPair ? '#1a1a2e' : '#888', borderRadius: '5px', padding: '4px 10px', cursor: !prevPair ? 'default' : 'pointer', fontSize: '0.78rem', flexShrink: 0 }}>←</button>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: '1rem', letterSpacing: '0.05em' }}>{activeCategory}</div>
+              {blockCategories.length > 1 && (
+                <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem', marginTop: '2px' }}>
+                  {catIndex + 1} de {blockCategories.length} en este bloque
+                </div>
+              )}
+            </div>
+            <button onClick={goToNext} disabled={!nextPair} style={{ background: 'none', border: '1px solid #333', color: !nextPair ? '#1a1a2e' : '#888', borderRadius: '5px', padding: '4px 10px', cursor: !nextPair ? 'default' : 'pointer', fontSize: '0.78rem', flexShrink: 0 }}>→</button>
+          </div>
+        ) : (
+          <div style={{ padding: '10px 14px', background: 'rgba(251,146,60,0.05)', border: '1px solid rgba(251,146,60,0.15)', borderRadius: '8px', color: '#fb923c', fontSize: '0.8rem' }}>
+            Este bloque no tiene categorías asignadas.{' '}
+            <button onClick={() => setEditingStructure(true)} style={{ background: 'none', border: 'none', color: '#7ecfff', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>Editar estructura</button>
+          </div>
+        )}
       </div>
 
-      {showForm && !editing && (
-        <div className="card" style={{ marginBottom: '20px' }}>
-          <ParticipantForm tournamentId={tournamentId} categories={categories} roundsCount={roundsCount} onSave={handleSave} onCancel={() => setShowForm(false)} />
-        </div>
+      {/* Participant list for current category */}
+      {activeCategory && (
+        <>
+          {catParticipants.length === 0 && !showForm && (
+            <p style={{ color: 'rgba(255,255,255,0.2)', textAlign: 'center', padding: '30px 0', fontSize: '0.85rem' }}>
+              Sin participantes en {activeCategory} — Bloque {activeBlock}
+            </p>
+          )}
+
+          {catParticipants.map(p => (
+            editing?.id === p.id ? (
+              <ParticipantForm
+                key={p.id}
+                initial={p}
+                tournamentId={tournamentId}
+                categories={categories}
+                roundsCount={roundsCount}
+                context={context}
+                onSave={handleSave}
+                onCancel={() => setEditing(null)}
+              />
+            ) : (
+              <div key={p.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#0f0f1a', borderRadius: '8px', padding: '10px 14px', marginBottom: '8px' }}>
+                {p.photo_path
+                  ? <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />
+                  : <div style={{ width: '44px', height: '44px', borderRadius: '6px', background: '#1a1a2e', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: '0.6rem' }}>Sin foto</div>
+                }
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                  {p.academia && <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem', marginTop: '2px' }}>{p.academia}</div>}
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                  <button onClick={() => setEditing(p)} style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '5px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem' }}>Editar</button>
+                  <button onClick={() => handleDelete(p)} style={{ background: 'none', border: '1px solid #333', color: '#666', borderRadius: '5px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.78rem' }}>✕</button>
+                </div>
+              </div>
+            )
+          ))}
+
+          {showForm ? (
+            <ParticipantForm
+              tournamentId={tournamentId}
+              categories={categories}
+              roundsCount={roundsCount}
+              context={context}
+              onSave={handleSave}
+              onCancel={() => setShowForm(false)}
+            />
+          ) : (
+            <button className="btn-secondary" style={{ marginTop: '8px', width: '100%' }} onClick={() => setShowForm(true)}>
+              + Añadir participante en {activeCategory}
+            </button>
+          )}
+        </>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {participants.map(p => (
-          <div key={p.id}>
-            {editing?.id === p.id ? (
-              <div className="card">
-                <ParticipantForm initial={p} tournamentId={tournamentId} categories={categories} roundsCount={roundsCount} onSave={handleSave} onCancel={() => setEditing(null)} />
-              </div>
-            ) : (
-              <div className="card" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-                {p.photo_path
-                  ? <img src={`/uploads/${p.photo_path}`} alt={p.name} style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
-                  : <div style={{ width: '60px', height: '60px', borderRadius: '8px', background: '#1a1a2e', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: '0.65rem', flexShrink: 0 }}>Sin foto</div>
-                }
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700 }}>{p.name}</div>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '3px', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span style={{ color: '#7ecfff', fontSize: '0.65rem', letterSpacing: '0.08em' }}>Bloque {p.round_number || 1}</span>
-                    {p.category && <span style={{ color: categoryColor(p.category), fontSize: '0.7rem', letterSpacing: '0.1em', fontWeight: 700 }}>{p.category}</span>}
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '3px', flexWrap: 'wrap' }}>
-                    {p.academia && <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem' }}>{p.academia}</span>}
-                    {p.localidad && <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.75rem' }}>{p.localidad}</span>}
-                    {p.coreografo && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem' }}>Cor: {p.coreografo}</span>}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button className="btn-secondary" style={{ fontSize: '0.8rem', padding: '6px 12px' }} onClick={() => setEditing(p)}>Editar</button>
-                  <button className="btn-danger" style={{ fontSize: '0.8rem', padding: '6px 12px' }} onClick={() => remove(p)}>Eliminar</button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-        {participants.length === 0 && !showForm && (
-          <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '40px' }}>No hay participantes. Añade el primero.</p>
-        )}
+      {/* Footer: edit structure link */}
+      <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #1a1a2e', textAlign: 'right' }}>
+        <button onClick={() => setEditingStructure(true)} style={{ background: 'none', border: 'none', color: 'rgba(126,207,255,0.4)', cursor: 'pointer', fontSize: '0.75rem', textDecoration: 'underline' }}>
+          Editar estructura de bloques
+        </button>
       </div>
     </div>
   );
@@ -870,14 +1070,21 @@ function MoveButtons({ onUp, onDown, disableUp, disableDown }) {
 }
 
 // ── ORDER tab ─────────────────────────────────────────────────────────────────
-function OrderTab({ tournamentId, participants, onUpdate }) {
+function OrderTab({ tournamentId, participants, onUpdate, activeBlock }) {
   const [hierarchy, setHierarchy] = useState(() => buildHierarchy(participants));
   const [saving, setSaving] = useState(false);
   const [orderDirty, setOrderDirty] = useState(false);
   const [orderSaved, setOrderSaved] = useState(false);
 
+  // Only rebuild hierarchy when the SET of participants changes (added/removed).
+  // Attribute changes (act_order, on_stage, etc.) must NOT reset the user's manual ordering.
+  const lastIdsRef = useRef(participants.map(p => p.id).join(','));
   useEffect(() => {
-    setHierarchy(buildHierarchy(participants));
+    const ids = participants.map(p => p.id).join(',');
+    if (ids !== lastIdsRef.current) {
+      lastIdsRef.current = ids;
+      setHierarchy(buildHierarchy(participants));
+    }
   }, [participants]);
 
   const markOrderDirty = () => { setOrderDirty(true); setOrderSaved(false); };
@@ -933,7 +1140,9 @@ function OrderTab({ tournamentId, participants, onUpdate }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
         <div>
-          <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: 0 }}>ORDEN DE ACTUACIÓN</h3>
+          <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: 0 }}>
+            ORDEN DE ACTUACIÓN{activeBlock ? ` — BLOQUE ${activeBlock}` : ''}
+          </h3>
           <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem', marginTop: '4px' }}>
             Reordena edades, categorías y participantes con las flechas. Guarda cuando termines.
           </p>
@@ -1201,7 +1410,7 @@ const _twPause = (t, now) => ({ running: false, startMs: null, pausedMs: t?.runn
 const _twReset = () => ({ running: false, startMs: null, pausedMs: 0 });
 const _twElapsed = (t, now) => !t ? 0 : t.running ? now - t.startMs : (t.pausedMs ?? 0);
 
-function TimingWidget({ timing, tournamentStatus }) {
+function TimingWidget({ timing, tournamentStatus, activeBlock }) {
   const [collapsed, setCollapsed] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -1279,7 +1488,11 @@ function TimingWidget({ timing, tournamentStatus }) {
 
   if (!timing?.started_at) return null;
 
-  const { blocks, blockTotals, globalAvg } = computeTiming(timing.participants, now);
+  const visibleParticipants = activeBlock != null
+    ? (timing.participants || []).filter(p => (p.round_number || 1) === activeBlock)
+    : (timing.participants || []);
+
+  const { blocks, blockTotals, globalAvg } = computeTiming(visibleParticipants, now);
   const roundOrder = Object.keys(blocks).map(Number).sort((a, b) => a - b);
 
   const btnSt = {
@@ -1331,8 +1544,6 @@ function TimingWidget({ timing, tournamentStatus }) {
       {/* Por bloque */}
       {roundOrder.map(round => {
         const bt = blockTotals[round];
-        const cats = blocks[round];
-        const catEntries = Object.entries(cats);
         const bKey = String(round);
         const bTimer = blockTimers[bKey];
         const bMs = _twElapsed(bTimer, now);
@@ -1353,32 +1564,6 @@ function TimingWidget({ timing, tournamentStatus }) {
                 <span style={{ color: '#34d399', fontSize: '0.72rem' }}>✓ completado</span>
               )}
             </div>
-            {/* Por categoría */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', paddingLeft: '8px' }}>
-              {catEntries.map(([cat, s]) => {
-                const cKey = `${round}:${cat}`;
-                const cTimer = catTimers[cKey];
-                const cMs = _twElapsed(cTimer, now);
-                return (
-                  <div key={cat} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                    <span style={{ color: categoryColor(cat), fontWeight: 700, fontSize: '0.7rem' }}>{cat}</span>
-                    <TimerRow
-                      ms={cMs}
-                      label=""
-                      timer={cTimer ?? _twReset()}
-                      onSet={t => setCatTimers(prev => ({ ...prev, [cKey]: t }))}
-                    />
-                    <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem' }}>{s.done}/{s.total}</span>
-                    {s.remaining != null && s.remaining > 1 && (
-                      <span style={{ color: '#fb923c', fontSize: '0.7rem' }}>~{fmtDuration(s.remaining)}</span>
-                    )}
-                    {s.remaining != null && s.remaining <= 1 && s.total > 0 && (
-                      <span style={{ color: '#34d399', fontSize: '0.7rem' }}>✓</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </div>
         );
       })}
@@ -1387,7 +1572,7 @@ function TimingWidget({ timing, tournamentStatus }) {
   );
 }
 
-function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd, scoresRefreshTick }) {
+function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd, scoresRefreshTick, activeBlock, loadBlock, totalBlocks }) {
   const [loading, setLoading] = useState(null);
   const [iframeCollapsed, setIframeCollapsed] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
@@ -1571,12 +1756,43 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
       {/* ── Left: control panel ── */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', borderRight: iframeCollapsed ? 'none' : '1px solid #1a1a2e', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
 
-        <TimingWidget timing={timing} tournamentStatus={tournamentStatus} />
+        <TimingWidget timing={timing} tournamentStatus={tournamentStatus} activeBlock={activeBlock} />
+
+        {/* ── Block switcher ── */}
+        {activeBlock !== null && totalBlocks > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'rgba(126,207,255,0.05)', border: '1px solid rgba(126,207,255,0.18)', borderRadius: '10px' }}>
+            <span style={{ color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", fontSize: '1rem', letterSpacing: '0.2em', flex: 1 }}>
+              BLOQUE {activeBlock} <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem', fontFamily: 'inherit' }}>de {totalBlocks}</span>
+            </span>
+            {Array.from({ length: totalBlocks }, (_, i) => i + 1).map(n => (
+              <button key={n} onClick={() => loadBlock(n)} style={{
+                background: n === activeBlock ? 'rgba(126,207,255,0.18)' : 'rgba(255,255,255,0.04)',
+                border: `1px solid ${n === activeBlock ? 'rgba(126,207,255,0.5)' : '#2a2a3e'}`,
+                color: n === activeBlock ? '#7ecfff' : 'rgba(255,255,255,0.4)',
+                borderRadius: '6px', padding: '4px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: n === activeBlock ? 700 : 400,
+              }}>
+                {n === activeBlock ? `▶ ${n}` : n}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Participant list */}
         <div style={{ border: '1px solid rgba(251,146,60,0.2)', borderRadius: '12px' }}>
-          <div style={{ padding: '10px 16px', background: 'rgba(251,146,60,0.05)', borderBottom: '1px solid rgba(251,146,60,0.12)', borderRadius: '12px 12px 0 0' }}>
-            <span style={{ color: '#fb923c', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.15em' }}>CONTROL DE ESCENA</span>
+          <div style={{ padding: '10px 16px', background: 'rgba(251,146,60,0.05)', borderBottom: '1px solid rgba(251,146,60,0.12)', borderRadius: '12px 12px 0 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ color: '#fb923c', fontWeight: 700, fontSize: '0.72rem', letterSpacing: '0.15em', flex: 1 }}>CONTROL DE ESCENA</span>
+            {activeBlock !== null && totalBlocks > 1 && activeBlock < totalBlocks && (() => {
+              const allDone = localParts.length > 0 && localParts.every(p => p.on_stage_duration_s > 0 || p.on_stage);
+              return allDone ? (
+                <button onClick={() => loadBlock(activeBlock + 1)} style={{
+                  background: 'rgba(52,211,153,0.12)', border: '1px solid rgba(52,211,153,0.4)',
+                  color: '#34d399', borderRadius: '6px', padding: '4px 12px', cursor: 'pointer',
+                  fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.05em',
+                }}>
+                  Comenzar Bloque {activeBlock + 1} →
+                </button>
+              ) : null;
+            })()}
           </div>
           <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {rounds.length === 0 && (
@@ -2019,6 +2235,11 @@ export default function CoreoAdmin() {
   const [timing, setTiming] = useState(null);
   const [scoresRefreshTick, setScoresRefreshTick] = useState(0);
   const [tab, setTab] = useState('config');
+  // Active block — server's current_round is the source of truth; starts at 1 and load() corrects it
+  const [activeBlock, setActiveBlock] = useState(1);
+  // Ref so load() and socket handlers can always read the latest activeBlock without stale closure
+  const activeBlockRef = useRef(1);
+  useEffect(() => { activeBlockRef.current = activeBlock; }, [activeBlock]);
   const [toast, setToast] = useState(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -2032,9 +2253,9 @@ export default function CoreoAdmin() {
   const [needsOrgLogin, setNeedsOrgLogin] = useState(false);
 
   const load = useCallback(async () => {
+    // Server always returns participants for current_round — no client-side filtering needed.
     const res = await apiFetch(`${API}/tournaments/${id}`);
     if (res.status === 401) {
-      // No admin token and no org code → show organizer login
       if (!isAdmin && !hasOrgCode) { setNeedsOrgLogin(true); return; }
       navigate('/admin'); return;
     }
@@ -2042,12 +2263,32 @@ export default function CoreoAdmin() {
     const data = await res.json();
     setTournament(data.tournament);
     setCriteria(data.criteria);
-    setParticipants(data.participants);
     setJudges(data.judges);
     setOrganizers(data.organizers || []);
     setSpeakers(data.speakers || []);
     setNeedsOrgLogin(false);
+
+    // Sync activeBlock from server's current_round
+    const serverRound = data.tournament.current_round || 1;
+    if (serverRound !== activeBlockRef.current) {
+      activeBlockRef.current = serverRound;
+      setActiveBlock(serverRound);
+    }
+    setParticipants(data.participants);
   }, [id, navigate, isAdmin, hasOrgCode]);
+
+  // loadBlock: called explicitly when switching blocks — updates current_round on server and notifies all clients
+  const loadBlock = useCallback(async (n) => {
+    const res = await apiFetch(`${API}/tournaments/${id}/advance-round`, {
+      method: 'POST',
+      body: JSON.stringify({ round: n }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    activeBlockRef.current = n;
+    setActiveBlock(n);
+    setParticipants(data.participants);
+  }, [id]);
 
   const loadTiming = useCallback(async () => {
     const r = await apiFetch(`${API}/tournaments/${id}/timing`);
@@ -2072,13 +2313,26 @@ export default function CoreoAdmin() {
     join();
     socket.on('connect', join);
     socket.on('coreo:criteria-updated', ({ criteria: c }) => setCriteria(c));
-    socket.on('coreo:config-updated', ({ coreo_categories, coreo_rounds }) =>
-      setTournament(prev => prev ? { ...prev, coreo_categories, coreo_rounds } : prev)
+    socket.on('coreo:config-updated', ({ coreo_categories, coreo_rounds, block_structure }) =>
+      setTournament(prev => prev ? {
+        ...prev,
+        ...(coreo_categories !== undefined && { coreo_categories }),
+        ...(coreo_rounds !== undefined && { coreo_rounds }),
+        ...(block_structure !== undefined && { block_structure: JSON.stringify(block_structure) }),
+      } : prev)
     );
     socket.on('coreo:participant-added', ({ participant: p }) => setParticipants(prev => [...prev, p]));
     socket.on('coreo:participant-updated', ({ participant: p }) => setParticipants(prev => prev.map(x => x.id === p.id ? p : x)));
     socket.on('coreo:participant-removed', ({ id: pid }) => setParticipants(prev => prev.filter(x => x.id !== pid)));
-    socket.on('coreo:order-updated', () => load());
+    socket.on('coreo:order-updated', ({ order }) => {
+      // Update act_order in-place — do NOT call load() to avoid full reload/filtering side-effects.
+      if (Array.isArray(order)) {
+        setParticipants(prev => prev.map(p => {
+          const entry = order.find(o => o.id === p.id);
+          return entry ? { ...p, act_order: entry.act_order } : p;
+        }));
+      }
+    });
     socket.on('coreo:judge-added', ({ judge }) => setJudges(prev => [...prev, judge]));
     socket.on('coreo:judge-removed', ({ id: jid }) => setJudges(prev => prev.filter(j => j.id !== jid)));
     socket.on('coreo:organizer-added', ({ organizer }) => setOrganizers(prev => [...prev, organizer]));
@@ -2102,6 +2356,14 @@ export default function CoreoAdmin() {
     socket.on('coreo:scores-updated', () => setScoresRefreshTick(t => t + 1));
     socket.on('coreo:staff-msg', (msg) => addToStaffThread({ dir: 'in', ...msg }));
     socket.on('coreo:restarted', () => { load(); loadTiming(); });
+    socket.on('coreo:round-changed', ({ round, participants: newParts }) => {
+      // Only update if this round-change came from another session (not ourselves — we already updated in loadBlock)
+      if (round !== activeBlockRef.current) {
+        activeBlockRef.current = round;
+        setActiveBlock(round);
+        setParticipants(newParts);
+      }
+    });
     return () => {
       socket.off('connect', join);
       ['coreo:criteria-updated', 'coreo:config-updated', 'coreo:participant-added',
@@ -2110,7 +2372,7 @@ export default function CoreoAdmin() {
         'coreo:organizer-removed', 'coreo:speaker-added', 'coreo:speaker-removed',
         'coreo:on-stage', 'coreo:off-stage', 'coreo:timer-started', 'coreo:timer-stopped',
         'coreo:poster-updated', 'coreo:timing-updated', 'coreo:scores-updated', 'coreo:staff-msg',
-        'coreo:restarted'].forEach(e => socket.off(e));
+        'coreo:restarted', 'coreo:round-changed'].forEach(e => socket.off(e));
     };
   }, [socket, id, load, loadTiming, addToStaffThread]);
 
@@ -2147,7 +2409,7 @@ export default function CoreoAdmin() {
     ? [
         { key: 'config', label: <span>Configuración{tabDot(configOk)}</span> },
         { key: 'participantes', label: <span>Participantes ({participants.length}){tabDot(participantesOk)}</span> },
-        { key: 'orden', label: <span>Orden{tabDot(ordenOk)}</span> },
+        ...(tournament.status === 'setup' ? [{ key: 'orden', label: <span>Orden{tabDot(ordenOk)}</span> }] : []),
         { key: 'puntuaciones', label: 'Puntuaciones' },
         { key: 'en-vivo', label: '▶ En escena', accent: true },
       ]
@@ -2286,6 +2548,9 @@ export default function CoreoAdmin() {
           staffThread={staffThread}
           onStaffAdd={addToStaffThread}
           scoresRefreshTick={scoresRefreshTick}
+          activeBlock={activeBlock}
+          loadBlock={loadBlock}
+          totalBlocks={roundsCount}
         />
       )}
 
@@ -2307,9 +2572,20 @@ export default function CoreoAdmin() {
             onUpdate={setParticipants}
             categories={parsedCategories}
             roundsCount={roundsCount}
+            activeBlock={activeBlock}
+            onBlockChange={loadBlock}
+            totalBlocks={roundsCount}
+            blockStructure={tournament?.block_structure}
+            onBlockStructureSave={(structure, cats) => {
+              setTournament(prev => prev ? {
+                ...prev,
+                block_structure: JSON.stringify(structure),
+                ...(cats !== undefined && { coreo_categories: JSON.stringify(cats) }),
+              } : prev);
+            }}
           />
         )}
-        {activeTab === 'orden' && <OrderTab tournamentId={Number(id)} participants={participants} onUpdate={setParticipants} />}
+        {activeTab === 'orden' && <OrderTab tournamentId={Number(id)} participants={participants} onUpdate={setParticipants} activeBlock={activeBlock} />}
       </div>
 
       <Toast msg={toast?.msg} type={toast?.type} />

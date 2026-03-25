@@ -30,11 +30,13 @@ router.get('/tournament/:id/state', requireJudge, (req, res) => {
   if (req.judge.tournament_id !== tid) return res.status(403).json({ error: 'Acceso denegado' });
 
   const criteria = db.prepare('SELECT * FROM criteria WHERE tournament_id = ? ORDER BY sort_order').all(tid);
+  const tournament = db.prepare('SELECT current_round FROM tournaments WHERE id = ?').get(tid);
+  const round = tournament?.current_round || 1;
 
   const participants = db.prepare(`
     SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number, on_stage_at, on_stage_duration_s
-    FROM participants WHERE tournament_id = ? ORDER BY COALESCE(act_order, 9999), id
-  `).all(tid);
+    FROM participants WHERE tournament_id = ? AND COALESCE(round_number, 1) = ? ORDER BY COALESCE(act_order, 9999), id
+  `).all(tid, round);
 
   res.json({ criteria, participants, judgeId: req.judge.id });
 });

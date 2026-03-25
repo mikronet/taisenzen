@@ -260,6 +260,10 @@ async function initDb() {
     "ALTER TABLE participants ADD COLUMN on_stage_duration_s REAL DEFAULT 0",
     // Timing: when the tournament actually started (first on-stage)
     "ALTER TABLE tournaments ADD COLUMN started_at INTEGER DEFAULT NULL",
+    // Coreo: which block is currently active (source of truth for all clients)
+    "ALTER TABLE tournaments ADD COLUMN current_round INTEGER DEFAULT 1",
+    // Coreo: block structure — which categories go in each block and in what order
+    "ALTER TABLE tournaments ADD COLUMN block_structure TEXT DEFAULT NULL",
   ];
   for (const sql of migrations) {
     try { db.run(sql); } catch (e) { /* column already exists */ }
@@ -269,13 +273,34 @@ async function initDb() {
   return db;
 }
 
+let _saveTimer = null;
+
 function save() {
+  if (_saveTimer) return; // ya hay un save pendiente
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    if (db) {
+      try {
+        fs.writeFileSync(dbPath, Buffer.from(db.export()));
+      } catch (e) {
+        console.error('[DB] Error al guardar en disco:', e.message);
+      }
+    }
+  }, 300);
+}
+
+function saveSync() {
+  if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
   if (db) {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
+    try { fs.writeFileSync(dbPath, Buffer.from(db.export())); } catch (e) {
+      console.error('[DB] Error en saveSync:', e.message);
+    }
   }
 }
+
+process.on('exit', saveSync);
+process.on('SIGINT',  () => { saveSync(); process.exit(0); });
+process.on('SIGTERM', () => { saveSync(); process.exit(0); });
 
 let inTransaction = false;
 
