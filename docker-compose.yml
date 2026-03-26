@@ -1,21 +1,13 @@
 version: '3.8'
 
 services:
-  battle-app:
+  taisen-zen:
     build: .
-    container_name: battle-app
+    container_name: taisen-zen
     restart: unless-stopped
     ports:
-      - "3080:3000"
+      - "3081:3000"
     volumes:
       - ./data:/app/data
-    environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - ADMIN_PASSWORD=Mikron3t
-      - JWT_SECRET=gUdtiIZS4vsEP29benRJNFCxBVMHOplwLjuGhzkq
-      - SMTP_HOST=smtp.migadu.com
-      - SMTP_PORT=465
-      - SMTP_USER=yo@sergiosegura.com
-      - SMTP_PASS=Sergiet3
-      - CONTACT_TO=sergio.mikro@gmail.com
+    env_file:
+      - .env

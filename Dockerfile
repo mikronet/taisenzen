@@ -14,7 +14,6 @@ RUN cd client && npm run build
 
 # Copiar servidor
 COPY server/ ./server/
-COPY .env* ./
 
 ENV NODE_ENV=production
 ENV PORT=3000
