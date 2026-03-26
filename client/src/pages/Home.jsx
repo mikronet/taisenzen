@@ -262,17 +262,17 @@ export default function Home() {
           background: 'radial-gradient(ellipse at top, rgba(233,69,96,0.11) 0%, transparent 68%)',
           pointerEvents: 'none',
         }} />
-        {/* TAISEN logo — letras con entrada escalonada + glow pulse continuo */}
+        {/* ZEN.TAISEN logo — letras con entrada escalonada + glow pulse continuo */}
         <h1 style={{
           fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: 'clamp(5rem, 18vw, 11rem)',
+          fontSize: 'clamp(3.5rem, 11vw, 7rem)',
           letterSpacing: '0.25em',
           lineHeight: 1,
           marginBottom: '4px',
           color: '#ffffff',
           animation: 'home-glow-pulse 3s ease-in-out infinite',
         }}>
-          {['T','A','I','S','E','N'].map((l, i) => (
+          {['Z','E','N','.','T','A','I','S','E','N'].map((l, i) => (
             <span key={i} style={{
               display: 'inline-block',
               opacity: 0,
@@ -440,7 +440,7 @@ export default function Home() {
               fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.4rem',
               letterSpacing: '0.25em', color: '#fff', marginBottom: '4px',
               textShadow: '0 0 20px rgba(233,69,96,0.5)',
-            }}>TAISEN</p>
+            }}>ZEN.TAISEN</p>
             <h2 style={{ color: '#888', fontSize: '0.8rem', letterSpacing: '0.25em', marginBottom: '24px' }}>
               ACCESO STAFF
             </h2>
@@ -496,7 +496,7 @@ export default function Home() {
               fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.4rem',
               letterSpacing: '0.25em', color: '#fff', marginBottom: '4px',
               textShadow: '0 0 20px rgba(233,69,96,0.5)',
-            }}>TAISEN</p>
+            }}>ZEN.TAISEN</p>
             <h2 style={{ color: '#888', fontSize: '0.8rem', letterSpacing: '0.25em', marginBottom: '24px' }}>
               ADMINISTRADOR
             </h2>
@@ -543,7 +543,7 @@ export default function Home() {
         gap: '6px 20px',
       }}>
         <Link to="/landing" style={{ color: 'var(--accent)', fontSize: '0.8rem', textDecoration: 'none', letterSpacing: '0.08em', fontWeight: 600 }}>
-          ¿Qué es TAISEN?
+          ¿Qué es ZEN.TAISEN?
         </Link>
         <span style={{ color: '#2a2a3e' }}>·</span>
         <span style={{ color: '#444', fontSize: '0.8rem' }}>
