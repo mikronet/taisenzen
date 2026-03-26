@@ -927,7 +927,14 @@ function ParticipantsTab({ tournamentId, participants, onUpdate, categories, rou
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: '#0f0f1a', border: '1px solid #1a1a2e', borderRadius: '8px' }}>
             <button onClick={goToPrev} disabled={!prevPair} style={{ background: 'none', border: '1px solid #333', color: !prevPair ? '#1a1a2e' : '#888', borderRadius: '5px', padding: '4px 10px', cursor: !prevPair ? 'default' : 'pointer', fontSize: '0.78rem', flexShrink: 0 }}>←</button>
             <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ color: '#fff', fontWeight: 700, fontSize: '1rem', letterSpacing: '0.05em' }}>{activeCategory}</div>
+              <div style={{ color: '#fff', fontWeight: 700, fontSize: '1rem', letterSpacing: '0.05em' }}>
+                {activeCategory}
+                {catParticipants.length > 0 && (
+                  <span style={{ marginLeft: '8px', color: '#7ecfff', fontWeight: 400, fontSize: '0.78rem' }}>
+                    {catParticipants.length}
+                  </span>
+                )}
+              </div>
               {blockCategories.length > 1 && (
                 <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.68rem', marginTop: '2px' }}>
                   {catIndex + 1} de {blockCategories.length} en este bloque
@@ -2408,7 +2415,7 @@ export default function CoreoAdmin() {
   const TABS = isAdmin
     ? [
         { key: 'config', label: <span>Configuración{tabDot(configOk)}</span> },
-        { key: 'participantes', label: <span>Participantes ({participants.length}){tabDot(participantesOk)}</span> },
+        { key: 'participantes', label: <span>Participantes{tabDot(participantesOk)}</span> },
         ...(tournament.status === 'setup' ? [{ key: 'orden', label: <span>Orden{tabDot(ordenOk)}</span> }] : []),
         { key: 'puntuaciones', label: 'Puntuaciones' },
         { key: 'en-vivo', label: '▶ En escena', accent: true },
