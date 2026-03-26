@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+// In-memory rate limiter: max 20 score/vote requests per judgeId per minute
+const judgeRateMap = new Map();
+const JUDGE_RATE_WINDOW_MS = 60 * 1000;
+const JUDGE_RATE_MAX = 20;
+function checkJudgeRate(judgeId) {
+  const now = Date.now();
+  const entries = (judgeRateMap.get(judgeId) || []).filter(t => now - t < JUDGE_RATE_WINDOW_MS);
+  if (entries.length >= JUDGE_RATE_MAX) return false;
+  entries.push(now);
+  judgeRateMap.set(judgeId, entries);
+  return true;
+}
+
 router.post('/login', (req, res) => {
   const { code } = req.body;
   const judge = db.prepare('SELECT j.*, t.name as tournament_name FROM judges j JOIN tournaments t ON j.tournament_id = t.id WHERE j.access_code = ?').get(code);
@@ -12,6 +25,9 @@ router.post('/login', (req, res) => {
 // Vote for elimination phase (pick winner or tie)
 router.post('/vote', (req, res) => {
   const { matchId, judgeId, choice } = req.body;
+  if (!checkJudgeRate(Number(judgeId))) {
+    return res.status(429).json({ error: 'Demasiadas solicitudes. Espera un momento.' });
+  }
   if (!['participant1', 'participant2', 'tie'].includes(choice)) {
     return res.status(400).json({ error: 'Opción inválida' });
   }
@@ -62,7 +78,9 @@ router.post('/vote', (req, res) => {
 router.post('/score', (req, res) => {
   const { matchId, judgeId, scores } = req.body;
   // scores is an array: [{participantId, score}, ...]
-
+  if (!checkJudgeRate(Number(judgeId))) {
+    return res.status(429).json({ error: 'Demasiadas solicitudes. Espera un momento.' });
+  }
   if (!Array.isArray(scores) || scores.length === 0) {
     return res.status(400).json({ error: 'Se requiere un array de puntuaciones' });
   }

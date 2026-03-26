@@ -6,6 +6,14 @@ const db = require('../db');
 const { upload, uploadsDir } = require('../upload');
 const { generateWordCode } = require('../wordCode');
 
+// Safely delete a file from uploads directory — prevents path traversal
+function safeUnlink(filename) {
+  if (!filename || typeof filename !== 'string') return;
+  const resolved = path.resolve(uploadsDir, filename);
+  if (!resolved.startsWith(path.resolve(uploadsDir) + path.sep)) return;
+  try { if (fs.existsSync(resolved)) fs.unlinkSync(resolved); } catch { /* ignore */ }
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────────
 // Accepts admin token OR organizer code scoped to the tournament
 function requireAdmin(req, res, next) {
@@ -122,10 +130,7 @@ router.post('/tournaments/:id/poster', upload.single('poster'), (req, res) => {
   if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
 
   // Delete old poster if exists
-  if (tournament.poster_path) {
-    const old = path.join(uploadsDir, tournament.poster_path);
-    if (fs.existsSync(old)) fs.unlinkSync(old);
-  }
+  safeUnlink(tournament.poster_path);
 
   const poster_path = req.file ? req.file.filename : null;
   db.prepare('UPDATE tournaments SET poster_path = ? WHERE id = ?').run(poster_path, tid);
@@ -140,10 +145,7 @@ router.delete('/tournaments/:id/poster', (req, res) => {
   const tournament = db.prepare('SELECT poster_path FROM tournaments WHERE id = ?').get(tid);
   if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
 
-  if (tournament.poster_path) {
-    const old = path.join(uploadsDir, tournament.poster_path);
-    if (fs.existsSync(old)) fs.unlinkSync(old);
-  }
+  safeUnlink(tournament.poster_path);
   db.prepare('UPDATE tournaments SET poster_path = NULL WHERE id = ?').run(tid);
   req.io.to(`screen:${tid}`).emit('coreo:poster-updated', { poster_path: null });
   req.io.to(`admin:${tid}`).emit('coreo:poster-updated', { poster_path: null });
@@ -232,10 +234,7 @@ router.put('/participants/:id', (req, res) => {
 
       let photoPath = participant.photo_path;
       if (req.file) {
-        if (photoPath) {
-          const oldFile = path.join(uploadsDir, photoPath);
-          if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
-        }
+        safeUnlink(photoPath);
         photoPath = req.file.filename;
       }
 
@@ -261,10 +260,7 @@ router.delete('/participants/:id', (req, res) => {
   const participant = db.prepare('SELECT * FROM participants WHERE id = ?').get(pid);
   if (!participant) return res.status(404).json({ error: 'Participante no encontrado' });
 
-  if (participant.photo_path) {
-    const filePath = path.join(uploadsDir, participant.photo_path);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  }
+  safeUnlink(participant.photo_path);
 
   db.prepare('DELETE FROM participants WHERE id = ?').run(pid);
   req.io.to(`admin:${participant.tournament_id}`).emit('coreo:participant-removed', { id: pid });
@@ -500,33 +496,44 @@ router.delete('/speakers/:id', (req, res) => {
 // ── GET /api/coreo/tournaments/:id/scores ────────────────────────────────────
 router.get('/tournaments/:id/scores', (req, res) => {
   const tid = Number(req.params.id);
-  const rows = db.prepare(`
-    SELECT p.id, p.name, p.category, p.age_group, p.act_order,
+  const roundFilter = req.query.round ? Number(req.query.round) : null;
+  let sql = `
+    SELECT p.id, p.name, p.category, p.age_group, p.act_order, p.round_number,
       COUNT(DISTINCT cs.judge_id) as judges_scored,
       SUM(cs.score) as total_raw, AVG(cs.score) as avg_score
     FROM participants p
     LEFT JOIN choreography_scores cs ON cs.participant_id = p.id
     WHERE p.tournament_id = ?
-    GROUP BY p.id ORDER BY avg_score DESC
-  `).all(tid);
+  `;
+  const params = [tid];
+  if (roundFilter) { sql += ' AND COALESCE(p.round_number, 1) = ?'; params.push(roundFilter); }
+  sql += ' GROUP BY p.id ORDER BY avg_score DESC';
+  const rows = db.prepare(sql).all(...params);
   res.json({ scores: rows });
 });
 
 // ── GET /api/coreo/tournaments/:id/scores/detail ─────────────────────────────
 router.get('/tournaments/:id/scores/detail', (req, res) => {
   const tid = Number(req.params.id);
-  const rows = db.prepare(`
+  const limit = Math.min(Number(req.query.limit) || 500, 1000);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const roundFilter = req.query.round ? Number(req.query.round) : null;
+  let sql = `
     SELECT cs.participant_id, cs.judge_id, cs.criterion_id, cs.score,
       j.name as judge_name, c.name as criterion_name, c.max_score,
-      p.name as participant_name
+      p.name as participant_name, p.round_number
     FROM choreography_scores cs
     JOIN judges j ON j.id = cs.judge_id
     JOIN criteria c ON c.id = cs.criterion_id
     JOIN participants p ON p.id = cs.participant_id
     WHERE cs.tournament_id = ?
-    ORDER BY cs.participant_id, cs.judge_id, c.sort_order
-  `).all(tid);
-  res.json({ detail: rows });
+  `;
+  const params = [tid];
+  if (roundFilter) { sql += ' AND COALESCE(p.round_number, 1) = ?'; params.push(roundFilter); }
+  sql += ' ORDER BY cs.participant_id, cs.judge_id, c.sort_order LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+  const rows = db.prepare(sql).all(...params);
+  res.json({ detail: rows, limit, offset });
 });
 
 // ── GET /api/coreo/tournaments/:id/scores/summary ────────────────────────────

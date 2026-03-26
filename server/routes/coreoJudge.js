@@ -2,6 +2,19 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+// In-memory rate limiter: max 30 score submissions per judgeId per minute
+const judgeRateMap = new Map();
+const JUDGE_RATE_WINDOW_MS = 60 * 1000;
+const JUDGE_RATE_MAX = 30;
+function checkJudgeRate(judgeId) {
+  const now = Date.now();
+  const entries = (judgeRateMap.get(judgeId) || []).filter(t => now - t < JUDGE_RATE_WINDOW_MS);
+  if (entries.length >= JUDGE_RATE_MAX) return false;
+  entries.push(now);
+  judgeRateMap.set(judgeId, entries);
+  return true;
+}
+
 // ── POST /api/coreo-judge/login ─────────────────────────────────────────────
 // Reuses the same judges table as battles
 router.post('/login', (req, res) => {
@@ -46,6 +59,9 @@ router.get('/tournament/:id/state', requireJudge, (req, res) => {
 // Body: { participantId, scores: [{ criterionId, score }] }
 router.post('/scores', requireJudge, (req, res) => {
   const { participantId, scores } = req.body;
+  if (!checkJudgeRate(req.judge.id)) {
+    return res.status(429).json({ error: 'Demasiadas solicitudes. Espera un momento.' });
+  }
   if (!participantId || !Array.isArray(scores)) return res.status(400).json({ error: 'Datos inválidos' });
 
   const participant = db.prepare('SELECT tournament_id FROM participants WHERE id = ?').get(Number(participantId));

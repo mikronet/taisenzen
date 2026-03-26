@@ -269,6 +269,31 @@ async function initDb() {
     try { db.run(sql); } catch (e) { /* column already exists */ }
   }
 
+  // Performance indexes — safe to run on existing DBs (IF NOT EXISTS)
+  const indexes = [
+    'CREATE INDEX IF NOT EXISTS idx_participants_tournament ON participants(tournament_id)',
+    'CREATE INDEX IF NOT EXISTS idx_participants_tournament_round ON participants(tournament_id, round_number)',
+    'CREATE INDEX IF NOT EXISTS idx_phases_tournament ON phases(tournament_id)',
+    'CREATE INDEX IF NOT EXISTS idx_matches_tournament ON matches(tournament_id)',
+    'CREATE INDEX IF NOT EXISTS idx_matches_phase ON matches(phase_id)',
+    'CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status)',
+    'CREATE INDEX IF NOT EXISTS idx_match_participants_match ON match_participants(match_id)',
+    'CREATE INDEX IF NOT EXISTS idx_match_participants_participant ON match_participants(participant_id)',
+    'CREATE INDEX IF NOT EXISTS idx_votes_match ON votes(match_id)',
+    'CREATE INDEX IF NOT EXISTS idx_filtros_scores_match ON filtros_scores(match_id)',
+    'CREATE INDEX IF NOT EXISTS idx_judges_tournament ON judges(tournament_id)',
+    'CREATE INDEX IF NOT EXISTS idx_organizers_tournament ON organizers(tournament_id)',
+    'CREATE INDEX IF NOT EXISTS idx_criteria_tournament ON criteria(tournament_id)',
+    'CREATE INDEX IF NOT EXISTS idx_choreography_scores_tournament ON choreography_scores(tournament_id)',
+    'CREATE INDEX IF NOT EXISTS idx_choreography_scores_participant ON choreography_scores(participant_id)',
+    'CREATE INDEX IF NOT EXISTS idx_smoke_points_phase ON smoke_points(phase_id)',
+    'CREATE INDEX IF NOT EXISTS idx_participant_members_participant ON participant_members(participant_id)',
+    'CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at)',
+  ];
+  for (const sql of indexes) {
+    db.run(sql);
+  }
+
   save();
   return db;
 }

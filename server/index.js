@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
@@ -38,6 +39,19 @@ async function start() {
 
   app.use(cors());
   app.use(express.json());
+
+  // Security headers
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader('Content-Security-Policy',
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:; font-src 'self' data:; object-src 'none';"
+      );
+    }
+    next();
+  });
 
   app.use((req, res, next) => {
     req.io = io;
@@ -109,11 +123,23 @@ async function start() {
 
   setupSocket(io);
 
+  // Periodic cleanup of expired admin sessions (every hour)
+  setInterval(() => {
+    try { db.prepare('DELETE FROM admin_sessions WHERE expires_at < ?').run(Date.now()); } catch { /* ignore */ }
+  }, 60 * 60 * 1000).unref();
+
   // Global Express error handler — catches any error passed to next(err) or thrown sync in routes
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
-    console.error(`[ERROR] ${req.method} ${req.path}:`, err.message || err);
-    if (res.headersSent) return;
+    const errMsg = `[ERROR] ${req.method} ${req.path}: ${err.message || err}`;
+    console.error(errMsg);
+    if (process.env.NODE_ENV === 'production') {
+      try {
+        const logFile = path.join(__dirname, '..', 'data', 'errors.log');
+        fs.appendFileSync(logFile, `${new Date().toISOString()} ${errMsg}\n`);
+      } catch { /* ignore log errors */ }
+    }
+    if (res.headersSent) return next(err);
     // Multer file type errors
     if (err.message && err.message.includes('Tipo de archivo no permitido')) {
       return res.status(400).json({ error: err.message });
