@@ -29,15 +29,23 @@ router.get('/:id', (req, res) => {
     WHERE m.tournament_id = ? ORDER BY m.phase_id, m.match_order
   `).all(tid);
 
-  // For Filtros matches, attach participant list (include member names for 2vs2)
-  matches.forEach(m => {
-    if (m.phase_type === 'filtros') {
-      m.participants = db.prepare(`
-        SELECT mp.position, p.id, p.name, p.member1_name, p.member2_name
-        FROM match_participants mp JOIN participants p ON mp.participant_id = p.id
-        WHERE mp.match_id = ? ORDER BY mp.position
-      `).all(m.id);
+  // Bulk-load filtros participants in one query (avoids N+1)
+  const filtrosMatchIds = matches.filter(m => m.phase_type === 'filtros').map(m => m.id);
+  const filtrosParticipantsByMatch = {};
+  if (filtrosMatchIds.length > 0) {
+    const placeholders = filtrosMatchIds.map(() => '?').join(',');
+    const allFp = db.prepare(`
+      SELECT mp.match_id, mp.position, p.id, p.name, p.member1_name, p.member2_name
+      FROM match_participants mp JOIN participants p ON mp.participant_id = p.id
+      WHERE mp.match_id IN (${placeholders}) ORDER BY mp.match_id, mp.position
+    `).all(...filtrosMatchIds);
+    for (const fp of allFp) {
+      if (!filtrosParticipantsByMatch[fp.match_id]) filtrosParticipantsByMatch[fp.match_id] = [];
+      filtrosParticipantsByMatch[fp.match_id].push(fp);
     }
+  }
+  matches.forEach(m => {
+    if (m.phase_type === 'filtros') m.participants = filtrosParticipantsByMatch[m.id] || [];
   });
 
   // For 7toSmoke phases, attach smoke_points

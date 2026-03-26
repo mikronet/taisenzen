@@ -10,12 +10,31 @@ const { initDb } = require('./db');
 const db = require('./db');
 const { uploadsDir } = require('./upload');
 
+// Validate required env vars at startup
+const REQUIRED_ENV = ['ADMIN_PASSWORD'];
+const OPTIONAL_ENV = { SMTP_HOST: 'email de contacto', SMTP_PASS: 'email de contacto', CONTACT_TO: 'destinatario de contactos' };
+for (const v of REQUIRED_ENV) {
+  if (!process.env[v]) { console.error(`[CONFIG] Variable obligatoria faltante: ${v}`); process.exit(1); }
+}
+for (const [v, desc] of Object.entries(OPTIONAL_ENV)) {
+  if (!process.env[v]) console.warn(`[CONFIG] Variable opcional no configurada: ${v} (${desc})`);
+}
+
 const mailer = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: Number(process.env.SMTP_PORT) || 465,
-  secure: true, // TLS on port 465
+  secure: true,
   auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
 });
+
+// Escape HTML to prevent injection in email body
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 async function start() {
   await initDb();
@@ -30,14 +49,24 @@ async function start() {
 
   const app = express();
   const server = http.createServer(app);
+
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+    : [];
+
   const io = new Server(server, {
     cors: {
-      origin: process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : false,
+      origin: process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : allowedOrigins,
       methods: ['GET', 'POST']
     }
   });
 
-  app.use(cors());
+  app.use(cors({
+    origin: process.env.NODE_ENV === 'development'
+      ? 'http://localhost:5173'
+      : (allowedOrigins.length > 0 ? allowedOrigins : false),
+    credentials: true,
+  }));
   app.use(express.json());
 
   // Security headers
@@ -76,32 +105,33 @@ async function start() {
 
     const { name, email, message } = req.body;
     if (!name || !email || !message) return res.status(400).json({ error: 'Faltan campos' });
-    // Save to DB
-    db.prepare('INSERT INTO contacts (name, email, message) VALUES (?, ?, ?)').run(
-      String(name).slice(0, 200),
-      String(email).slice(0, 200),
-      String(message).slice(0, 2000)
-    );
-    // Send email
     try {
-      await mailer.sendMail({
+      db.prepare('INSERT INTO contacts (name, email, message) VALUES (?, ?, ?)').run(
+        String(name).slice(0, 200),
+        String(email).slice(0, 200),
+        String(message).slice(0, 2000)
+      );
+    } catch (err) {
+      console.error('[contact] DB error:', err.message);
+      return res.status(500).json({ error: 'Error al guardar el mensaje. Inténtalo más tarde.' });
+    }
+    // Send email (non-blocking — message is already saved to DB)
+    if (process.env.SMTP_HOST && process.env.CONTACT_TO) {
+      mailer.sendMail({
         from: `"TAISEN Contacto" <${process.env.SMTP_USER}>`,
         to: process.env.CONTACT_TO,
         replyTo: String(email).slice(0, 200),
-        subject: `[TAISEN] Nuevo contacto de ${String(name).slice(0, 100)}`,
+        subject: `[TAISEN] Nuevo contacto de ${escHtml(String(name).slice(0, 100))}`,
         text: `Nombre: ${name}\nEmail: ${email}\n\n${message}`,
-        html: `<p><strong>Nombre:</strong> ${name}</p><p><strong>Email:</strong> ${email}</p><hr/><p>${String(message).replace(/\n/g, '<br/>')}</p>`,
-      });
-    } catch (err) {
-      console.error('Contact email error:', err.message);
-      // Still return success — message was saved to DB
+        html: `<p><strong>Nombre:</strong> ${escHtml(name)}</p><p><strong>Email:</strong> ${escHtml(email)}</p><hr/><p>${escHtml(message).replace(/\n/g, '<br/>')}</p>`,
+      }).catch(err => console.error('[contact] Email error:', err.message));
     }
     res.json({ success: true });
   });
 
-  // Health check endpoint
+  // Health check endpoint (no sensitive info)
   app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', uptime: process.uptime() });
+    res.json({ status: 'ok' });
   });
 
   app.use('/api/admin', adminRoutes);
@@ -140,7 +170,6 @@ async function start() {
       } catch { /* ignore log errors */ }
     }
     if (res.headersSent) return next(err);
-    // Multer file type errors
     if (err.message && err.message.includes('Tipo de archivo no permitido')) {
       return res.status(400).json({ error: err.message });
     }
@@ -149,14 +178,13 @@ async function start() {
 
   const PORT = process.env.PORT || 3000;
   server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Battle App running on port ${PORT}`);
+    console.info(`[SERVER] Escuchando en puerto ${PORT} (${process.env.NODE_ENV || 'development'})`);
   });
 }
 
 // Prevent crashes from uncaught sync errors outside route handlers
 process.on('uncaughtException', (err) => {
   console.error('[FATAL] uncaughtException:', err);
-  // db.saveSync() will be called by the process 'exit' handler in db.js
 });
 
 process.on('unhandledRejection', (reason) => {

@@ -645,7 +645,7 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
           style={{ width: '90px', height: '90px', borderRadius: '10px', border: '2px dashed #333', cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#111', flexShrink: 0 }}
         >
           {preview
-            ? <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <img src={preview} alt="Vista previa de foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             : <span style={{ color: '#444', fontSize: '0.68rem', textAlign: 'center', padding: '8px', lineHeight: 1.4 }}>Foto<br/>(jueces)</span>
           }
           <input type="file" ref={fileRef} accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
@@ -975,7 +975,7 @@ function ParticipantsTab({ tournamentId, participants, onUpdate, categories, rou
             ) : (
               <div key={p.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', background: '#0f0f1a', borderRadius: '8px', padding: '10px 14px', marginBottom: '8px' }}>
                 {p.photo_path
-                  ? <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />
+                  ? <img src={`/uploads/${p.photo_path}`} alt={p.name} style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }} />
                   : <div style={{ width: '44px', height: '44px', borderRadius: '6px', background: '#1a1a2e', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#333', fontSize: '0.6rem' }}>Sin foto</div>
                 }
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1228,7 +1228,7 @@ function OrderTab({ tournamentId, participants, onUpdate, activeBlock }) {
                             }}>{pi + 1}</span>
                           </div>
                           {p.photo_path
-                            ? <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
+                            ? <img src={`/uploads/${p.photo_path}`} alt={p.name} style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
                             : <div style={{ width: '38px', height: '38px', borderRadius: '5px', background: '#1a1a2e', flexShrink: 0 }} />
                           }
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1854,7 +1854,7 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
                           opacity: isDimmed ? 0.45 : 1,
                         }}>
                           <span style={{ color: 'rgba(255,255,255,0.2)', minWidth: '18px', fontSize: '0.75rem' }}>{idx}</span>
-                          {p.photo_path && <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} />}
+                          {p.photo_path && <img src={`/uploads/${p.photo_path}`} alt={p.name} style={{ width: '32px', height: '32px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0 }} />}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: ss !== 'idle' || isNext ? 700 : 400, fontSize: '0.88rem', color: isDimmed ? 'rgba(255,255,255,0.4)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                             {p.academia && <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.62rem', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.academia}</div>}

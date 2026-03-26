@@ -289,6 +289,7 @@ async function initDb() {
     'CREATE INDEX IF NOT EXISTS idx_smoke_points_phase ON smoke_points(phase_id)',
     'CREATE INDEX IF NOT EXISTS idx_participant_members_participant ON participant_members(participant_id)',
     'CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at)',
+    'CREATE INDEX IF NOT EXISTS idx_matches_phase_status ON matches(phase_id, status)',
   ];
   for (const sql of indexes) {
     db.run(sql);

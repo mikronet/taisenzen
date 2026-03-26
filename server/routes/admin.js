@@ -115,7 +115,7 @@ router.post('/tournaments', (req, res) => {
 });
 
 router.get('/tournaments', (req, res) => {
-  res.json(db.prepare('SELECT * FROM tournaments ORDER BY created_at DESC').all());
+  res.json(db.prepare('SELECT * FROM tournaments ORDER BY created_at DESC LIMIT 200').all());
 });
 
 router.get('/tournaments/:id', (req, res) => {

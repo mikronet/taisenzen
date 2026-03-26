@@ -332,7 +332,7 @@ function JudgePanel({ judge, onLogout }) {
         >
           <img
             src={`/uploads/${zoomedPhoto}`}
-            alt=""
+            alt="Foto del participante"
             style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: '10px', boxShadow: '0 0 60px rgba(0,0,0,0.8)' }}
           />
         </div>
@@ -452,7 +452,7 @@ function JudgePanel({ judge, onLogout }) {
                               {p.photo_path && (
                                 <img
                                   src={`/uploads/${p.photo_path}`}
-                                  alt=""
+                                  alt={p.name}
                                   onClick={e => { e.stopPropagation(); setZoomedPhoto(p.photo_path); }}
                                   style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0, cursor: 'zoom-in', border: isOnStage ? '1px solid rgba(126,207,255,0.4)' : '1px solid rgba(255,255,255,0.08)' }}
                                 />

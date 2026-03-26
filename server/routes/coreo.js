@@ -185,7 +185,10 @@ router.put('/tournaments/:id/criteria', (req, res) => {
 // ── POST /api/coreo/tournaments/:id/participants ─────────────────────────────
 router.post('/tournaments/:id/participants', (req, res) => {
   upload.single('photo')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'La imagen es demasiado grande (máx. 8 MB).' });
+      return res.status(400).json({ error: 'Formato de archivo no válido. Solo se aceptan imágenes (jpg, png, gif, webp).' });
+    }
     try {
       const tid = Number(req.params.id);
       const { name, category, age_group, academia, localidad, coreografo, round_number } = req.body;
@@ -220,7 +223,10 @@ router.post('/tournaments/:id/participants', (req, res) => {
 // ── PUT /api/coreo/participants/:id ──────────────────────────────────────────
 router.put('/participants/:id', (req, res) => {
   upload.single('photo')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'La imagen es demasiado grande (máx. 8 MB).' });
+      return res.status(400).json({ error: 'Formato de archivo no válido. Solo se aceptan imágenes (jpg, png, gif, webp).' });
+    }
     try {
       const pid = Number(req.params.id);
       const participant = db.prepare('SELECT * FROM participants WHERE id = ?').get(pid);

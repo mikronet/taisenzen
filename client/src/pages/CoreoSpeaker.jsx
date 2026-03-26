@@ -293,7 +293,7 @@ function SpeakerPanel({ tournament, participants: initialParticipants, speakerNa
                 animation: 'pulse-stage 1.6s ease-in-out infinite',
               }} />
               {onStage.photo_path && (
-                <img src={`/uploads/${onStage.photo_path}`} alt="" style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+                <img src={`/uploads/${onStage.photo_path}`} alt={onStage.name} style={{ width: '52px', height: '52px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
               )}
               <div>
                 <div style={{ fontWeight: 700, fontSize: '1.15rem', lineHeight: 1.2 }}>{onStage.name}</div>
@@ -386,7 +386,7 @@ function SpeakerPanel({ tournament, participants: initialParticipants, speakerNa
                               }}>
                                 <span style={{ color: isNow ? '#fb923c' : 'rgba(255,255,255,0.2)', minWidth: '20px', fontSize: '0.8rem', fontWeight: isNow ? 700 : 400 }}>{num}</span>
                                 {p.photo_path
-                                  ? <img src={`/uploads/${p.photo_path}`} alt="" style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
+                                  ? <img src={`/uploads/${p.photo_path}`} alt={p.name} style={{ width: '36px', height: '36px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
                                   : <div style={{ width: '36px', height: '36px', borderRadius: '5px', background: '#1a1a2e', flexShrink: 0 }} />
                                 }
                                 <div style={{ flex: 1, minWidth: 0 }}>
