@@ -50,23 +50,29 @@ async function start() {
   const app = express();
   const server = http.createServer(app);
 
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
-    : [];
+  // Builds an origin checker that accepts the configured domain and all its subdomains
+  function makeOriginChecker() {
+    if (process.env.NODE_ENV === 'development') return 'http://localhost:5173';
+    const domain = process.env.ALLOWED_DOMAIN; // e.g. "taisen.es"
+    const extras = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    if (!domain && extras.length === 0) return false;
+    return (origin, cb) => {
+      if (!origin) return cb(null, true); // same-origin / server-to-server
+      const ok = (domain && (origin === `https://${domain}` || origin.endsWith(`.${domain}`)))
+        || extras.includes(origin);
+      cb(ok ? null : new Error('CORS not allowed'), ok);
+    };
+  }
+
+  const originChecker = makeOriginChecker();
 
   const io = new Server(server, {
-    cors: {
-      origin: process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : allowedOrigins,
-      methods: ['GET', 'POST']
-    }
+    cors: { origin: originChecker, methods: ['GET', 'POST'] }
   });
 
-  app.use(cors({
-    origin: process.env.NODE_ENV === 'development'
-      ? 'http://localhost:5173'
-      : (allowedOrigins.length > 0 ? allowedOrigins : false),
-    credentials: true,
-  }));
+  app.use(cors({ origin: originChecker, credentials: true }));
   app.use(express.json());
 
   // Security headers
