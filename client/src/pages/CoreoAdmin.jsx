@@ -1082,6 +1082,10 @@ function OrderTab({ tournamentId, participants, onUpdate, activeBlock }) {
   const [saving, setSaving] = useState(false);
   const [orderDirty, setOrderDirty] = useState(false);
   const [orderSaved, setOrderSaved] = useState(false);
+  const [viewBlock, setViewBlock] = useState(() => activeBlock || 1);
+
+  // Sync viewBlock when activeBlock prop changes (e.g. changed from PARTICIPANTES)
+  useEffect(() => { if (activeBlock) setViewBlock(activeBlock); }, [activeBlock]);
 
   // Only rebuild hierarchy when the SET of participants changes (added/removed).
   // Attribute changes (act_order, on_stage, etc.) must NOT reset the user's manual ordering.
@@ -1140,18 +1144,26 @@ function OrderTab({ tournamentId, participants, onUpdate, activeBlock }) {
     return <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '60px' }}>Añade participantes primero.</p>;
   }
 
-  // Running counter across the whole flattened list
-  let counter = 0;
+  // Resolve which block to show (clamp to valid range)
+  const ri = Math.max(0, Math.min(hierarchy.findIndex(r => r.round_number === viewBlock), hierarchy.length - 1));
+  const visibleRound = hierarchy[ri] ?? hierarchy[0];
+  const totalBlocks = hierarchy.length;
+
+  // Global act_order counter offset: participants in blocks before the visible one
+  const counterOffset = hierarchy.slice(0, ri).reduce(
+    (sum, rnd) => sum + rnd.categories.reduce((s, c) => s + c.participants.length, 0), 0
+  );
+  let counter = counterOffset;
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: 0 }}>
-            ORDEN DE ACTUACIÓN{activeBlock ? ` — BLOQUE ${activeBlock}` : ''}
+            ORDEN DE ACTUACIÓN
           </h3>
           <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem', marginTop: '4px' }}>
-            Reordena edades, categorías y participantes con las flechas. Guarda cuando termines.
+            Reordena categorías y participantes con las flechas. Guarda cuando termines.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1162,96 +1174,119 @@ function OrderTab({ tournamentId, participants, onUpdate, activeBlock }) {
         </div>
       </div>
 
+      {/* Block navigator */}
+      {totalBlocks > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 14px', background: 'rgba(126,207,255,0.04)', border: '1px solid rgba(126,207,255,0.1)', borderRadius: '8px', marginBottom: '16px' }}>
+          <button
+            onClick={() => setViewBlock(hierarchy[ri - 1].round_number)}
+            disabled={ri === 0}
+            style={{ background: 'none', border: '1px solid #333', color: ri === 0 ? '#1a1a2e' : '#888', borderRadius: '5px', padding: '4px 10px', cursor: ri === 0 ? 'default' : 'pointer', fontSize: '0.78rem' }}
+          >←</button>
+          <span style={{ flex: 1, textAlign: 'center', color: '#7ecfff', fontWeight: 700, fontSize: '0.9rem', letterSpacing: '0.12em', fontFamily: "'Bebas Neue', sans-serif" }}>
+            BLOQUE {visibleRound.round_number}
+            <span style={{ color: 'rgba(255,255,255,0.25)', fontWeight: 400, fontSize: '0.72rem', marginLeft: '8px', fontFamily: 'inherit' }}>
+              de {totalBlocks}
+            </span>
+          </span>
+          <button
+            onClick={() => setViewBlock(hierarchy[ri + 1].round_number)}
+            disabled={ri === totalBlocks - 1}
+            style={{ background: 'none', border: '1px solid #333', color: ri === totalBlocks - 1 ? '#1a1a2e' : '#888', borderRadius: '5px', padding: '4px 10px', cursor: ri === totalBlocks - 1 ? 'default' : 'pointer', fontSize: '0.78rem' }}
+          >→</button>
+        </div>
+      )}
+
+      {/* Only render the visible block */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {hierarchy.map((rnd, ri) => (
-          <div key={rnd.round_number} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(126,207,255,0.15)' }}>
-            {/* Round header */}
-            <div style={{
-              background: 'rgba(126,207,255,0.07)',
-              padding: '10px 16px',
-              display: 'flex', alignItems: 'center', gap: '12px',
-            }}>
-              <MoveButtons
-                onUp={() => moveRound(ri, -1)} disableUp={ri === 0}
-                onDown={() => moveRound(ri, 1)} disableDown={ri === hierarchy.length - 1}
-              />
-              <div style={{ flex: 1 }}>
-                <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.15em', fontFamily: "'Bebas Neue', sans-serif" }}>
-                  BLOQUE {rnd.round_number}
-                </span>
-                <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem', marginLeft: '10px' }}>
-                  {rnd.categories.reduce((n, c) => n + c.participants.length, 0)} participantes
-                </span>
-              </div>
-            </div>
-
-            {/* Categories within this round */}
-            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {rnd.categories.map((cat, ci) => (
-                <div key={cat.category} style={{ borderRadius: '8px', border: `1px solid ${categoryColor(cat.category)}30`, overflow: 'hidden' }}>
-                  {/* Category header */}
-                  <div style={{
-                    background: `${categoryColor(cat.category)}12`,
-                    padding: '8px 14px',
-                    display: 'flex', alignItems: 'center', gap: '10px',
-                  }}>
-                    <MoveButtons
-                      onUp={() => moveCat(ri, ci, -1)} disableUp={ci === 0}
-                      onDown={() => moveCat(ri, ci, 1)} disableDown={ci === rnd.categories.length - 1}
-                    />
-                    <span style={{ color: categoryColor(cat.category), fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.12em', flex: 1 }}>
-                      {cat.category === '—' ? 'Sin categoría' : cat.category.toUpperCase()}
-                      <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, marginLeft: '8px', fontSize: '0.72rem' }}>
-                        {cat.participants.length} {cat.participants.length === 1 ? 'grupo' : 'grupos'}
-                      </span>
-                    </span>
-                  </div>
-
-                  {/* Participants within this category */}
-                  <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {cat.participants.map((p, pi) => {
-                      counter++;
-                      const pos = counter;
-                      return (
-                        <div key={p.id} style={{
-                          display: 'flex', gap: '10px', alignItems: 'center',
-                          background: '#0f0f1a', borderRadius: '6px', padding: '8px 12px',
-                        }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '28px', gap: '2px' }}>
-                            <span style={{
-                              color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif",
-                              fontSize: '1.2rem', textAlign: 'center', lineHeight: 1,
-                            }}>{pos}</span>
-                            <span style={{
-                              color: categoryColor(cat.category), fontSize: '0.62rem',
-                              fontWeight: 700, letterSpacing: '0.05em', lineHeight: 1,
-                            }}>{pi + 1}</span>
-                          </div>
-                          {p.photo_path
-                            ? <img src={`/uploads/${p.photo_path}`} alt={p.name} style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
-                            : <div style={{ width: '38px', height: '38px', borderRadius: '5px', background: '#1a1a2e', flexShrink: 0 }} />
-                          }
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-                            {p.academia && (
-                              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {p.academia}
-                              </div>
-                            )}
-                          </div>
-                          <MoveButtons
-                            onUp={() => movePart(ri, ci, pi, -1)} disableUp={pi === 0}
-                            onDown={() => movePart(ri, ci, pi, 1)} disableDown={pi === cat.participants.length - 1}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+        <div style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid rgba(126,207,255,0.15)' }}>
+          {/* Round header */}
+          <div style={{
+            background: 'rgba(126,207,255,0.07)',
+            padding: '10px 16px',
+            display: 'flex', alignItems: 'center', gap: '12px',
+          }}>
+            <MoveButtons
+              onUp={() => { moveRound(ri, -1); setViewBlock(hierarchy[ri - 1].round_number); }}
+              disableUp={ri === 0}
+              onDown={() => { moveRound(ri, 1); setViewBlock(hierarchy[ri + 1].round_number); }}
+              disableDown={ri === hierarchy.length - 1}
+            />
+            <div style={{ flex: 1 }}>
+              <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.95rem', letterSpacing: '0.15em', fontFamily: "'Bebas Neue', sans-serif" }}>
+                BLOQUE {visibleRound.round_number}
+              </span>
+              <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem', marginLeft: '10px' }}>
+                {visibleRound.categories.reduce((n, c) => n + c.participants.length, 0)} participantes
+              </span>
             </div>
           </div>
-        ))}
+
+          {/* Categories within this round */}
+          <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {visibleRound.categories.map((cat, ci) => (
+              <div key={cat.category} style={{ borderRadius: '8px', border: `1px solid ${categoryColor(cat.category)}30`, overflow: 'hidden' }}>
+                {/* Category header */}
+                <div style={{
+                  background: `${categoryColor(cat.category)}12`,
+                  padding: '8px 14px',
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                }}>
+                  <MoveButtons
+                    onUp={() => moveCat(ri, ci, -1)} disableUp={ci === 0}
+                    onDown={() => moveCat(ri, ci, 1)} disableDown={ci === visibleRound.categories.length - 1}
+                  />
+                  <span style={{ color: categoryColor(cat.category), fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.12em', flex: 1 }}>
+                    {cat.category === '—' ? 'Sin categoría' : cat.category.toUpperCase()}
+                    <span style={{ color: 'rgba(255,255,255,0.2)', fontWeight: 400, marginLeft: '8px', fontSize: '0.72rem' }}>
+                      {cat.participants.length} {cat.participants.length === 1 ? 'grupo' : 'grupos'}
+                    </span>
+                  </span>
+                </div>
+
+                {/* Participants within this category */}
+                <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {cat.participants.map((p, pi) => {
+                    counter++;
+                    const pos = counter;
+                    return (
+                      <div key={p.id} style={{
+                        display: 'flex', gap: '10px', alignItems: 'center',
+                        background: '#0f0f1a', borderRadius: '6px', padding: '8px 12px',
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '28px', gap: '2px' }}>
+                          <span style={{
+                            color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif",
+                            fontSize: '1.2rem', textAlign: 'center', lineHeight: 1,
+                          }}>{pos}</span>
+                          <span style={{
+                            color: categoryColor(cat.category), fontSize: '0.62rem',
+                            fontWeight: 700, letterSpacing: '0.05em', lineHeight: 1,
+                          }}>{pi + 1}</span>
+                        </div>
+                        {p.photo_path
+                          ? <img src={`/uploads/${p.photo_path}`} alt={p.name} style={{ width: '38px', height: '38px', objectFit: 'cover', borderRadius: '5px', flexShrink: 0 }} />
+                          : <div style={{ width: '38px', height: '38px', borderRadius: '5px', background: '#1a1a2e', flexShrink: 0 }} />
+                        }
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
+                          {p.academia && (
+                            <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.72rem', marginTop: '1px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {p.academia}
+                            </div>
+                          )}
+                        </div>
+                        <MoveButtons
+                          onUp={() => movePart(ri, ci, pi, -1)} disableUp={pi === 0}
+                          onDown={() => movePart(ri, ci, pi, 1)} disableDown={pi === cat.participants.length - 1}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
