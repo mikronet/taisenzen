@@ -544,17 +544,30 @@ router.get('/tournaments/:id/scores/detail', (req, res) => {
 
 // ── GET /api/coreo/tournaments/:id/scores/summary ────────────────────────────
 // Per-participant per-judge per-criterion scores + global avg + allVoted flag
+// Optional: ?round=N to filter to a specific block
 router.get('/tournaments/:id/scores/summary', (req, res) => {
   const tid = Number(req.params.id);
+  const roundFilter = req.query.round ? Number(req.query.round) : null;
 
   const criteria = db.prepare('SELECT * FROM criteria WHERE tournament_id = ? ORDER BY sort_order').all(tid);
   const judges = db.prepare('SELECT id, name FROM judges WHERE tournament_id = ? ORDER BY id').all(tid);
 
-  const scores = db.prepare(`
+  let scoresSql = `
     SELECT cs.participant_id, cs.judge_id, cs.criterion_id, cs.score
     FROM choreography_scores cs
     WHERE cs.tournament_id = ?
-  `).all(tid);
+  `;
+  const scoresParams = [tid];
+  if (roundFilter) {
+    scoresSql = `
+      SELECT cs.participant_id, cs.judge_id, cs.criterion_id, cs.score
+      FROM choreography_scores cs
+      JOIN participants p ON p.id = cs.participant_id
+      WHERE cs.tournament_id = ? AND COALESCE(p.round_number, 1) = ?
+    `;
+    scoresParams.push(roundFilter);
+  }
+  const scores = db.prepare(scoresSql).all(...scoresParams);
 
   if (!scores.length) return res.json({ criteria, judges, participants: [] });
 

@@ -1452,81 +1452,13 @@ const _twPause = (t, now) => ({ running: false, startMs: null, pausedMs: t?.runn
 const _twReset = () => ({ running: false, startMs: null, pausedMs: 0 });
 const _twElapsed = (t, now) => !t ? 0 : t.running ? now - t.startMs : (t.pausedMs ?? 0);
 
-function TimingWidget({ timing, tournamentStatus, activeBlock }) {
+function TimingWidget({ timing, tourTimer, setTourTimer, blockTimers, setBlockTimers, activeBlock }) {
   const [collapsed, setCollapsed] = useState(false);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
   }, []);
-
-  // Independent stopwatches for tournament / blocks / categories
-  const [tourTimer, setTourTimer] = useState(null);
-  const [blockTimers, setBlockTimers] = useState({});
-  const [catTimers, setCatTimers] = useState({});
-  const didInitTour = useRef(false);
-
-  // Auto-init tournament timer from started_at (first time only)
-  useEffect(() => {
-    if (timing?.started_at && !didInitTour.current) {
-      didInitTour.current = true;
-      setTourTimer({ running: tournamentStatus === 'active', startMs: timing.started_at, pausedMs: 0 });
-    }
-  }, [timing?.started_at, tournamentStatus]);
-
-  // Auto-start all timers when a participant begins performing
-  useEffect(() => {
-    const active = timing?.participants?.find(p => p.on_stage_at);
-    if (!active) return;
-    const ref = active.on_stage_at; // use actual start time so elapsed is correct on page reload
-    const bKey = String(active.round_number || 1);
-    const cKey = `${active.round_number || 1}:${active.category || '—'}`;
-    setTourTimer(prev => prev?.running ? prev : { running: true, startMs: ref - (prev?.pausedMs ?? 0), pausedMs: 0 });
-    setBlockTimers(prev => prev[bKey]?.running ? prev : { ...prev, [bKey]: { running: true, startMs: ref - (prev[bKey]?.pausedMs ?? 0), pausedMs: 0 } });
-    setCatTimers(prev => prev[cKey]?.running ? prev : { ...prev, [cKey]: { running: true, startMs: ref - (prev[cKey]?.pausedMs ?? 0), pausedMs: 0 } });
-  }, [timing?.participants]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-stop category / block timers when all participants in them have finished
-  useEffect(() => {
-    if (!timing?.participants?.length) return;
-    const snap = Date.now();
-    const groups = {};
-    for (const p of timing.participants) {
-      const r = String(p.round_number || 1);
-      const cat = p.category || '—';
-      if (!groups[r]) groups[r] = {};
-      if (!groups[r][cat]) groups[r][cat] = { done: 0, total: 0, inProgress: false };
-      groups[r][cat].total++;
-      if (p.on_stage) groups[r][cat].inProgress = true;
-      else if (p.on_stage_duration_s > 0) groups[r][cat].done++;
-    }
-    setCatTimers(prev => {
-      let changed = false;
-      const next = { ...prev };
-      for (const [r, cats] of Object.entries(groups)) {
-        for (const [cat, s] of Object.entries(cats)) {
-          const cKey = `${r}:${cat}`;
-          if (s.total > 0 && s.done === s.total && !s.inProgress && prev[cKey]?.running) {
-            next[cKey] = _twPause(prev[cKey], snap);
-            changed = true;
-          }
-        }
-      }
-      return changed ? next : prev;
-    });
-    setBlockTimers(prev => {
-      let changed = false;
-      const next = { ...prev };
-      for (const [r, cats] of Object.entries(groups)) {
-        const allDone = Object.values(cats).every(s => s.total > 0 && s.done === s.total && !s.inProgress);
-        if (allDone && prev[r]?.running) {
-          next[r] = _twPause(prev[r], snap);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [timing?.participants]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!timing?.started_at) return null;
 
@@ -1614,7 +1546,7 @@ function TimingWidget({ timing, tournamentStatus, activeBlock }) {
   );
 }
 
-function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd, scoresRefreshTick, activeBlock, loadBlock, totalBlocks }) {
+function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd, scoresRefreshTick, activeBlock, loadBlock, totalBlocks, tourTimer, setTourTimer, blockTimers, setBlockTimers }) {
   const [loading, setLoading] = useState(null);
   const [iframeCollapsed, setIframeCollapsed] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
@@ -1798,7 +1730,7 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
       {/* ── Left: control panel ── */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', borderRight: iframeCollapsed ? 'none' : '1px solid #1a1a2e', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
 
-        <TimingWidget timing={timing} tournamentStatus={tournamentStatus} activeBlock={activeBlock} />
+        <TimingWidget timing={timing} tourTimer={tourTimer} setTourTimer={setTourTimer} blockTimers={blockTimers} setBlockTimers={setBlockTimers} activeBlock={activeBlock} />
 
         {/* ── Block switcher ── */}
         {activeBlock !== null && totalBlocks > 1 && (
@@ -2082,10 +2014,12 @@ function OrganizerLogin({ onLogin }) {
 }
 
 // ── ScoresTab ─────────────────────────────────────────────────────────────────
-function ScoresTab({ tournamentId, scoresRefreshTick }) {
+function ScoresTab({ tournamentId, scoresRefreshTick, activeBlock, totalBlocks }) {
+  const [viewBlock, setViewBlock] = useState(() => activeBlock || 1);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sendingRanking, setSendingRanking] = useState({}); // { 'round:cat': true }
+  const [collapsedCats, setCollapsedCats] = useState({}); // { 'cat': true }
 
   const sendCategoryRanking = async (round, cat, catParts) => {
     const key = `${round}:${cat}`;
@@ -2105,99 +2039,131 @@ function ScoresTab({ tournamentId, scoresRefreshTick }) {
     }
   };
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (block) => {
     setLoading(true);
     try {
-      const r = await apiFetch(`/api/coreo/tournaments/${tournamentId}/scores/summary`);
+      const roundParam = (totalBlocks > 1 && block) ? `?round=${block}` : '';
+      const r = await apiFetch(`/api/coreo/tournaments/${tournamentId}/scores/summary${roundParam}`);
       const d = await r.json();
       setData(d);
     } finally {
       setLoading(false);
     }
-  }, [tournamentId]);
+  }, [tournamentId, totalBlocks]);
 
-  useEffect(() => { load(); }, [load, scoresRefreshTick]);
+  useEffect(() => { load(viewBlock); }, [load, scoresRefreshTick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '60px' }}>Cargando...</div>;
-  if (!data) return null;
-
-  const { criteria, judges = [], participants } = data;
-
-  if (!criteria.length) return <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '60px' }}>No hay criterios configurados.</div>;
-  if (!participants.length) return (
-    <div style={{ textAlign: 'center', paddingTop: '60px' }}>
-      <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '2rem', marginBottom: '12px' }}>—</div>
-      <div style={{ color: 'rgba(255,255,255,0.3)' }}>Aún no hay puntuaciones registradas.</div>
-      <button onClick={load} style={{ marginTop: '20px', background: 'none', border: '1px solid #333', color: '#888', fontSize: '0.75rem', padding: '6px 14px', borderRadius: '20px', cursor: 'pointer' }}>↻ Actualizar</button>
-    </div>
-  );
-
-  // Group by round → category, sort within category by globalAvg desc
-  const roundMap = {}; const roundOrder = [];
-  for (const p of participants) {
-    const r = p.round_number || 1;
-    const cat = p.category || '—';
-    if (!roundMap[r]) { roundMap[r] = {}; roundOrder.push(r); }
-    if (!roundMap[r][cat]) roundMap[r][cat] = [];
-    roundMap[r][cat].push(p);
-  }
-  const grouped = roundOrder.map(r => ({
-    round: r,
-    categories: Object.keys(roundMap[r]).map(cat => ({
-      cat,
-      participants: [...roundMap[r][cat]].sort((a, b) => {
-        if (a.globalAvg == null && b.globalAvg == null) return 0;
-        if (a.globalAvg == null) return 1; if (b.globalAvg == null) return -1;
-        return b.globalAvg - a.globalAvg;
-      }),
-    })),
-  }));
+  const handleBlockChange = (n) => {
+    setViewBlock(n);
+    setCollapsedCats({});
+    load(n);
+  };
 
   const thBase = { padding: '8px 10px', color: 'rgba(255,255,255,0.4)', fontWeight: 400, whiteSpace: 'nowrap', borderBottom: '1px solid #1a1a2e', fontSize: '0.75rem' };
   const thRight = { ...thBase, textAlign: 'right' };
   const JUDGE_COLORS = ['#7ecfff', '#a78bfa', '#34d399', '#fb923c', '#f472b6', '#facc15'];
   const PODIUM = ['#fbbf24', '#94a3b8', '#cd7f32']; // gold, silver, bronze
 
+  const { criteria = [], judges = [], participants = [] } = data || {};
+
+  // Group by category, sort within category by globalAvg desc
+  const categories = [];
+  const catMap = {};
+  for (const p of participants) {
+    const cat = p.category || '—';
+    if (!catMap[cat]) { catMap[cat] = []; categories.push(cat); }
+    catMap[cat].push(p);
+  }
+  const grouped = categories.map(cat => ({
+    cat,
+    participants: [...catMap[cat]].sort((a, b) => {
+      if (a.globalAvg == null && b.globalAvg == null) return 0;
+      if (a.globalAvg == null) return 1; if (b.globalAvg == null) return -1;
+      return b.globalAvg - a.globalAvg;
+    }),
+  }));
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
         <h2 style={{ margin: 0, fontFamily: "'Bebas Neue', sans-serif", letterSpacing: '0.15em', color: '#7ecfff', fontSize: '1.3rem' }}>
-          PUNTUACIONES <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', fontFamily: 'inherit' }}>({participants.length} grupos · {judges.length} jueces)</span>
+          PUNTUACIONES
+          {!loading && data && <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', fontFamily: 'inherit' }}> ({participants.length} grupos · {judges.length} jueces)</span>}
         </h2>
-        <button onClick={load} style={{ background: 'none', border: '1px solid #333', color: '#888', fontSize: '0.75rem', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer' }}>↻ Actualizar</button>
+        <button onClick={() => load(viewBlock)} style={{ background: 'none', border: '1px solid #333', color: '#888', fontSize: '0.75rem', padding: '5px 12px', borderRadius: '20px', cursor: 'pointer' }}>↻ Actualizar</button>
       </div>
 
-      {grouped.map(({ round, categories }) => (
-        <div key={round} style={{ marginBottom: '36px' }}>
-          <div style={{ fontFamily: "'Bebas Neue', sans-serif", letterSpacing: '0.2em', color: '#7ecfff', fontSize: '1.1rem', marginBottom: '20px', paddingBottom: '8px', borderBottom: '1px solid rgba(126,207,255,0.2)' }}>
-            BLOQUE {round}
-          </div>
+      {/* Block navigator */}
+      {totalBlocks > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '24px', padding: '10px 14px', background: 'rgba(126,207,255,0.05)', border: '1px solid rgba(126,207,255,0.18)', borderRadius: '10px' }}>
+          <span style={{ color: '#7ecfff', fontFamily: "'Bebas Neue', sans-serif", fontSize: '1rem', letterSpacing: '0.2em', flex: 1 }}>
+            BLOQUE {viewBlock} <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: '0.75rem', fontFamily: 'inherit' }}>de {totalBlocks}</span>
+          </span>
+          {Array.from({ length: totalBlocks }, (_, i) => i + 1).map(n => (
+            <button key={n} onClick={() => handleBlockChange(n)} style={{
+              background: n === viewBlock ? 'rgba(126,207,255,0.18)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${n === viewBlock ? 'rgba(126,207,255,0.5)' : '#2a2a3e'}`,
+              color: n === viewBlock ? '#7ecfff' : 'rgba(255,255,255,0.4)',
+              borderRadius: '6px', padding: '4px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: n === viewBlock ? 700 : 400,
+            }}>
+              {n === viewBlock ? `▶ ${n}` : n}
+            </button>
+          ))}
+        </div>
+      )}
 
-          {categories.map(({ cat, participants: catParts }) => {
-            const catComplete = catParts.length > 0 && catParts.every(p => p.allVoted);
-            const rankKey = `${round}:${cat}`;
-            return (
-            <div key={cat} style={{ marginBottom: '28px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                <div style={{ color: categoryColor(cat), fontSize: '0.72rem', letterSpacing: '0.18em', fontWeight: 700, textTransform: 'uppercase' }}>
-                  {cat}
-                </div>
-                {catComplete && (
-                  <button
-                    onClick={() => {
-                      if (!window.confirm(`¿Enviar el ranking de "${cat}" al staff? Esto mostrará el Top 3 en su panel.`)) return;
-                      sendCategoryRanking(round, cat, catParts);
-                    }}
-                    disabled={sendingRanking[rankKey]}
-                    style={{ marginLeft: 'auto', background: 'rgba(126,207,255,0.08)', border: '1px solid rgba(126,207,255,0.3)', color: '#7ecfff', padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.05em' }}>
-                    {sendingRanking[rankKey] ? '...' : '🏆 Enviar ranking'}
-                  </button>
-                )}
+      {loading && <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '40px' }}>Cargando...</div>}
+
+      {!loading && !data && null}
+
+      {!loading && data && !criteria.length && (
+        <div style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', paddingTop: '60px' }}>No hay criterios configurados.</div>
+      )}
+
+      {!loading && data && criteria.length > 0 && !participants.length && (
+        <div style={{ textAlign: 'center', paddingTop: '60px' }}>
+          <div style={{ color: 'rgba(255,255,255,0.2)', fontSize: '2rem', marginBottom: '12px' }}>—</div>
+          <div style={{ color: 'rgba(255,255,255,0.3)' }}>Aún no hay puntuaciones para este bloque.</div>
+        </div>
+      )}
+
+      {!loading && data && criteria.length > 0 && participants.length > 0 && grouped.map(({ cat, participants: catParts }) => {
+        const catComplete = catParts.length > 0 && catParts.every(p => p.allVoted);
+        const rankKey = `${viewBlock}:${cat}`;
+        const isCollapsed = !!collapsedCats[cat];
+        return (
+          <div key={cat} style={{ marginBottom: '20px', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '10px', overflow: 'hidden' }}>
+            {/* Category header — clickable to collapse */}
+            <div
+              onClick={() => setCollapsedCats(prev => ({ ...prev, [cat]: !prev[cat] }))}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 16px', background: 'rgba(255,255,255,0.03)', cursor: 'pointer', userSelect: 'none' }}
+            >
+              <div style={{ color: categoryColor(cat), fontSize: '0.72rem', letterSpacing: '0.18em', fontWeight: 700, textTransform: 'uppercase', flex: 1 }}>
+                {cat}
+                <span style={{ color: 'rgba(255,255,255,0.25)', fontFamily: 'inherit', letterSpacing: '0.05em', marginLeft: '8px', fontSize: '0.85em' }}>
+                  {catParts.length} participantes
+                </span>
               </div>
-              <div style={{ overflowX: 'auto', borderRadius: '8px', border: '1px solid #1a1a2e' }}>
+              {catComplete && !isCollapsed && (
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (!window.confirm(`¿Enviar el ranking de "${cat}" al staff? Esto mostrará el Top 3 en su panel.`)) return;
+                    sendCategoryRanking(viewBlock, cat, catParts);
+                  }}
+                  disabled={sendingRanking[rankKey]}
+                  style={{ background: 'rgba(126,207,255,0.08)', border: '1px solid rgba(126,207,255,0.3)', color: '#7ecfff', padding: '4px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600, letterSpacing: '0.05em' }}>
+                  {sendingRanking[rankKey] ? '...' : '🏆 Enviar ranking'}
+                </button>
+              )}
+              <span style={{ color: 'rgba(126,207,255,0.4)', fontSize: '0.65rem' }}>{isCollapsed ? '▶' : '▼'}</span>
+            </div>
+
+            {!isCollapsed && (
+              <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                   <thead>
-                    {/* Row 1: judge name headers */}
                     <tr style={{ background: '#0d0d1a' }}>
                       <th rowSpan={2} style={{ ...thBase, textAlign: 'left', color: 'rgba(255,255,255,0.25)', minWidth: '28px' }}>#</th>
                       <th rowSpan={2} style={{ ...thBase, textAlign: 'left', color: 'rgba(255,255,255,0.4)', minWidth: '120px' }}>Participante</th>
@@ -2209,9 +2175,8 @@ function ScoresTab({ tournamentId, scoresRefreshTick }) {
                       ))}
                       <th rowSpan={2} style={{ ...thRight, color: '#7ecfff', fontWeight: 700, borderLeft: '2px solid rgba(126,207,255,0.2)', minWidth: '60px' }}>TOTAL</th>
                     </tr>
-                    {/* Row 2: criteria per judge */}
                     <tr style={{ background: '#0f0f1a' }}>
-                      {judges.map((j, ji) =>
+                      {judges.map((j) =>
                         criteria.map((c, ci) => (
                           <th key={`${j.id}-${c.id}`} style={{ ...thRight, borderLeft: ci === 0 ? '1px solid #1a1a2e' : undefined, fontSize: '0.7rem' }}>
                             {c.name}
@@ -2225,16 +2190,14 @@ function ScoresTab({ tournamentId, scoresRefreshTick }) {
                     {catParts.map((p, idx) => {
                       const total = p.globalAvg;
                       const podiumColor = idx < 3 && total != null ? PODIUM[idx] : null;
-                      const rowBg = podiumColor
-                        ? `${podiumColor}0d`
-                        : idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
+                      const rowBg = podiumColor ? `${podiumColor}0d` : idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
                       return (
                         <tr key={p.id} style={{ borderBottom: '1px solid #1a1a2e', background: rowBg }}>
                           <td style={{ padding: '10px 10px', color: podiumColor ?? 'rgba(255,255,255,0.25)', fontSize: '0.75rem', fontWeight: podiumColor ? 700 : 400 }}>
                             {podiumColor ? ['🥇','🥈','🥉'][idx] : idx + 1}
                           </td>
                           <td style={{ padding: '10px 10px', color: podiumColor ?? '#fff', fontWeight: podiumColor ? 700 : 500 }}>{p.name}</td>
-                          {judges.map((j, ji) =>
+                          {judges.map((j) =>
                             criteria.map((c, ci) => {
                               const val = p.judgeScores?.[j.id]?.[c.id];
                               return (
@@ -2253,11 +2216,10 @@ function ScoresTab({ tournamentId, scoresRefreshTick }) {
                   </tbody>
                 </table>
               </div>
-            </div>
-            );
-          })}
-        </div>
-      ))}
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -2288,6 +2250,75 @@ export default function CoreoAdmin() {
   // Staff communication thread — lives here so messages survive tab switches
   const [staffThread, setStaffThread] = useState([]);
   const addToStaffThread = useCallback((entry) => setStaffThread(prev => [...prev, entry]), []);
+
+  // ── Timer state (lives here to survive EN VIVO tab switches) ──
+  const [tourTimer, setTourTimer] = useState(null);
+  const [blockTimers, setBlockTimers] = useState({});
+  const [catTimers, setCatTimers] = useState({});
+  const didInitTour = useRef(false);
+
+  // Auto-init tour timer from started_at (once only — survives tab switches via parent state)
+  useEffect(() => {
+    if (timing?.started_at && !didInitTour.current) {
+      didInitTour.current = true;
+      const isActive = tournament?.status === 'active' || timing?.status === 'active';
+      setTourTimer({ running: isActive, startMs: timing.started_at, pausedMs: 0 });
+    }
+  }, [timing?.started_at, tournament?.status, timing?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-start all timers when a participant begins performing
+  useEffect(() => {
+    const active = timing?.participants?.find(p => p.on_stage_at);
+    if (!active) return;
+    const ref = active.on_stage_at;
+    const bKey = String(active.round_number || 1);
+    const cKey = `${active.round_number || 1}:${active.category || '—'}`;
+    setTourTimer(prev => prev?.running ? prev : { running: true, startMs: ref - (prev?.pausedMs ?? 0), pausedMs: 0 });
+    setBlockTimers(prev => prev[bKey]?.running ? prev : { ...prev, [bKey]: { running: true, startMs: ref - (prev[bKey]?.pausedMs ?? 0), pausedMs: 0 } });
+    setCatTimers(prev => prev[cKey]?.running ? prev : { ...prev, [cKey]: { running: true, startMs: ref - (prev[cKey]?.pausedMs ?? 0), pausedMs: 0 } });
+  }, [timing?.participants]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-stop category / block timers when all participants in them have finished
+  useEffect(() => {
+    if (!timing?.participants?.length) return;
+    const snap = Date.now();
+    const groups = {};
+    for (const p of timing.participants) {
+      const r = String(p.round_number || 1);
+      const cat = p.category || '—';
+      if (!groups[r]) groups[r] = {};
+      if (!groups[r][cat]) groups[r][cat] = { done: 0, total: 0, inProgress: false };
+      groups[r][cat].total++;
+      if (p.on_stage) groups[r][cat].inProgress = true;
+      else if (p.on_stage_duration_s > 0) groups[r][cat].done++;
+    }
+    setCatTimers(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [r, cats] of Object.entries(groups)) {
+        for (const [cat, s] of Object.entries(cats)) {
+          const cKey = `${r}:${cat}`;
+          if (s.total > 0 && s.done === s.total && !s.inProgress && prev[cKey]?.running) {
+            next[cKey] = _twPause(prev[cKey], snap);
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+    setBlockTimers(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [r, cats] of Object.entries(groups)) {
+        const allDone = Object.values(cats).every(s => s.total > 0 && s.done === s.total && !s.inProgress);
+        if (allDone && prev[r]?.running) {
+          next[r] = _twPause(prev[r], snap);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [timing?.participants]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auth state: could be admin token or organizer code
   const isAdmin = !!sessionStorage.getItem('adminToken');
@@ -2546,7 +2577,7 @@ export default function CoreoAdmin() {
       {/* Puntuaciones tab: full-width outside the narrow container */}
       {activeTab === 'puntuaciones' && (
         <div style={{ padding: '28px 32px' }}>
-          <ScoresTab tournamentId={Number(id)} scoresRefreshTick={scoresRefreshTick} />
+          <ScoresTab tournamentId={Number(id)} scoresRefreshTick={scoresRefreshTick} activeBlock={activeBlock} totalBlocks={roundsCount} />
         </div>
       )}
 
@@ -2593,6 +2624,10 @@ export default function CoreoAdmin() {
           activeBlock={activeBlock}
           loadBlock={loadBlock}
           totalBlocks={roundsCount}
+          tourTimer={tourTimer}
+          setTourTimer={setTourTimer}
+          blockTimers={blockTimers}
+          setBlockTimers={setBlockTimers}
         />
       )}
 
