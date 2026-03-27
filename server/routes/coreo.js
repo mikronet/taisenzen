@@ -3,7 +3,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
-const { upload, uploadsDir } = require('../upload');
+const { upload, uploadParticipant, uploadsDir } = require('../upload');
 const { generateWordCode } = require('../wordCode');
 
 // Safely delete a file from uploads directory — prevents path traversal
@@ -110,7 +110,7 @@ router.get('/tournaments/:id', (req, res) => {
     SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number,
            on_stage_at, on_stage_duration_s
     FROM participants WHERE tournament_id = ? AND COALESCE(round_number, 1) = ? ORDER BY COALESCE(act_order, 9999), id
-  `).all([tid, roundFilter]);
+  `).all(tid, roundFilter);
 
   for (const p of participants) {
     p.members = db.prepare('SELECT member_name FROM participant_members WHERE participant_id = ? ORDER BY sort_order').all(p.id).map(r => r.member_name);
@@ -184,17 +184,24 @@ router.put('/tournaments/:id/criteria', (req, res) => {
 
 // ── POST /api/coreo/tournaments/:id/participants ─────────────────────────────
 router.post('/tournaments/:id/participants', (req, res) => {
-  upload.single('photo')(req, res, (err) => {
+  uploadParticipant.fields([{ name: 'photo', maxCount: 1 }, { name: 'audio', maxCount: 1 }])(req, res, (err) => {
     if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'La imagen es demasiado grande (máx. 8 MB).' });
-      return res.status(400).json({ error: 'Formato de archivo no válido. Solo se aceptan imágenes (jpg, png, gif, webp).' });
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Archivo demasiado grande (foto máx. 8 MB, audio máx. 30 MB).' });
+      return res.status(400).json({ error: err.message || 'Formato de archivo no válido.' });
     }
     try {
       const tid = Number(req.params.id);
       const { name, category, age_group, academia, localidad, coreografo, round_number } = req.body;
       if (!name?.trim()) return res.status(400).json({ error: 'El nombre es obligatorio' });
 
-      const photoPath = req.file ? req.file.filename : null;
+      const photoFile = req.files?.photo?.[0];
+      const audioFile = req.files?.audio?.[0];
+      if (photoFile && photoFile.size > 8 * 1024 * 1024) {
+        safeUnlink(photoFile.filename);
+        return res.status(400).json({ error: 'La imagen es demasiado grande (máx. 8 MB).' });
+      }
+      const photoPath = photoFile ? photoFile.filename : null;
+      const audioPath = audioFile ? audioFile.filename : null;
       const cat = category?.trim() || '';
       const ageGrp = age_group?.trim() || '';
       const rnd = Math.max(1, Number(round_number) || 1);
@@ -202,13 +209,13 @@ router.post('/tournaments/:id/participants', (req, res) => {
       let pid;
       const txn = db.transaction(() => {
         const result = db.prepare(
-          'INSERT INTO participants (tournament_id, name, category, age_group, photo_path, academia, localidad, coreografo, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-        ).run(tid, name.trim(), cat, ageGrp, photoPath, academia?.trim() || null, localidad?.trim() || null, coreografo?.trim() || null, rnd);
+          'INSERT INTO participants (tournament_id, name, category, age_group, photo_path, audio_path, academia, localidad, coreografo, round_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        ).run(tid, name.trim(), cat, ageGrp, photoPath, audioPath, academia?.trim() || null, localidad?.trim() || null, coreografo?.trim() || null, rnd);
         pid = result.lastInsertRowid;
       });
       txn();
 
-      const participant = db.prepare('SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number FROM participants WHERE id = ?').get(pid);
+      const participant = db.prepare('SELECT id, name, category, age_group, photo_path, audio_path, act_order, on_stage, academia, localidad, coreografo, round_number FROM participants WHERE id = ?').get(pid);
       participant.members = [];
 
       req.io.to(`admin:${tid}`).emit('coreo:participant-added', { participant });
@@ -222,10 +229,10 @@ router.post('/tournaments/:id/participants', (req, res) => {
 
 // ── PUT /api/coreo/participants/:id ──────────────────────────────────────────
 router.put('/participants/:id', (req, res) => {
-  upload.single('photo')(req, res, (err) => {
+  uploadParticipant.fields([{ name: 'photo', maxCount: 1 }, { name: 'audio', maxCount: 1 }])(req, res, (err) => {
     if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'La imagen es demasiado grande (máx. 8 MB).' });
-      return res.status(400).json({ error: 'Formato de archivo no válido. Solo se aceptan imágenes (jpg, png, gif, webp).' });
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Archivo demasiado grande (foto máx. 8 MB, audio máx. 30 MB).' });
+      return res.status(400).json({ error: err.message || 'Formato de archivo no válido.' });
     }
     try {
       const pid = Number(req.params.id);
@@ -238,17 +245,26 @@ router.put('/participants/:id', (req, res) => {
       const newName = name?.trim() || participant.name;
       const rnd = round_number !== undefined ? Math.max(1, Number(round_number) || 1) : (participant.round_number || 1);
 
-      let photoPath = participant.photo_path;
-      if (req.file) {
-        safeUnlink(photoPath);
-        photoPath = req.file.filename;
+      const photoFile = req.files?.photo?.[0];
+      const audioFile = req.files?.audio?.[0];
+      if (photoFile && photoFile.size > 8 * 1024 * 1024) {
+        safeUnlink(photoFile.filename);
+        return res.status(400).json({ error: 'La imagen es demasiado grande (máx. 8 MB).' });
       }
 
-      db.prepare(
-        'UPDATE participants SET name = ?, category = ?, age_group = ?, photo_path = ?, academia = ?, localidad = ?, coreografo = ?, round_number = ? WHERE id = ?'
-      ).run(newName, cat, ageGrp, photoPath, academia?.trim() || null, localidad?.trim() || null, coreografo?.trim() || null, rnd, pid);
+      let photoPath = participant.photo_path;
+      if (photoFile) { safeUnlink(photoPath); photoPath = photoFile.filename; }
 
-      const updated = db.prepare('SELECT id, name, category, age_group, photo_path, act_order, on_stage, academia, localidad, coreografo, round_number FROM participants WHERE id = ?').get(pid);
+      let audioPath = participant.audio_path;
+      if (audioFile) { safeUnlink(audioPath); audioPath = audioFile.filename; }
+      // Allow explicit removal: remove_audio=1 in body
+      if (req.body.remove_audio === '1') { safeUnlink(audioPath); audioPath = null; }
+
+      db.prepare(
+        'UPDATE participants SET name = ?, category = ?, age_group = ?, photo_path = ?, audio_path = ?, academia = ?, localidad = ?, coreografo = ?, round_number = ? WHERE id = ?'
+      ).run(newName, cat, ageGrp, photoPath, audioPath, academia?.trim() || null, localidad?.trim() || null, coreografo?.trim() || null, rnd, pid);
+
+      const updated = db.prepare('SELECT id, name, category, age_group, photo_path, audio_path, act_order, on_stage, academia, localidad, coreografo, round_number FROM participants WHERE id = ?').get(pid);
       updated.members = [];
 
       req.io.to(`admin:${participant.tournament_id}`).emit('coreo:participant-updated', { participant: updated });
@@ -360,7 +376,7 @@ router.post('/participants/:id/on-stage', (req, res) => {
   });
   txn();
 
-  const full = db.prepare('SELECT id, name, category, age_group, photo_path, act_order, on_stage, on_stage_at, on_stage_duration_s, academia, localidad, coreografo, round_number FROM participants WHERE id = ?').get(pid);
+  const full = db.prepare('SELECT id, name, category, age_group, photo_path, audio_path, act_order, on_stage, on_stage_at, on_stage_duration_s, academia, localidad, coreografo, round_number FROM participants WHERE id = ?').get(pid);
   const onStageData = { ...full, members: [] };
 
   db.prepare('UPDATE tournaments SET screen_state = ? WHERE id = ?').run(
@@ -644,6 +660,26 @@ router.post('/tournaments/:id/restart', requireAdmin, (req, res) => {
   txn();
 
   req.io.to(`admin:${tid}`).to(`judge:${tid}`).to(`coreo-speaker:${tid}`).to(`screen:${tid}`).emit('coreo:restarted', { tournamentId: tid });
+  res.json({ ok: true });
+});
+
+// ── Music control ─────────────────────────────────────────────────────────────
+router.post('/tournaments/:id/music/play', requireAdmin, (req, res) => {
+  const tid = Number(req.params.id);
+  const { position = 0 } = req.body;
+  req.io.to(`screen:${tid}`).emit('coreo:music-play', { position: Number(position) || 0 });
+  res.json({ ok: true });
+});
+
+router.post('/tournaments/:id/music/pause', requireAdmin, (req, res) => {
+  const tid = Number(req.params.id);
+  req.io.to(`screen:${tid}`).emit('coreo:music-pause');
+  res.json({ ok: true });
+});
+
+router.post('/tournaments/:id/music/stop', requireAdmin, (req, res) => {
+  const tid = Number(req.params.id);
+  req.io.to(`screen:${tid}`).emit('coreo:music-stop');
   res.json({ ok: true });
 });
 

@@ -272,7 +272,7 @@ export default function Home() {
           color: '#ffffff',
           animation: 'home-glow-pulse 3s ease-in-out infinite',
         }}>
-          {['Z','E','N','.','T','A','I','S','E','N'].map((l, i) => (
+          {['T','A','I','S','E','N'].map((l, i) => (
             <span key={i} style={{
               display: 'inline-block',
               opacity: 0,
@@ -440,7 +440,7 @@ export default function Home() {
               fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.4rem',
               letterSpacing: '0.25em', color: '#fff', marginBottom: '4px',
               textShadow: '0 0 20px rgba(233,69,96,0.5)',
-            }}>ZEN.TAISEN</p>
+            }}>TAISEN</p>
             <h2 style={{ color: '#888', fontSize: '0.8rem', letterSpacing: '0.25em', marginBottom: '24px' }}>
               ACCESO STAFF
             </h2>
@@ -496,7 +496,7 @@ export default function Home() {
               fontFamily: "'Bebas Neue', sans-serif", fontSize: '1.4rem',
               letterSpacing: '0.25em', color: '#fff', marginBottom: '4px',
               textShadow: '0 0 20px rgba(233,69,96,0.5)',
-            }}>ZEN.TAISEN</p>
+            }}>TAISEN</p>
             <h2 style={{ color: '#888', fontSize: '0.8rem', letterSpacing: '0.25em', marginBottom: '24px' }}>
               ADMINISTRADOR
             </h2>

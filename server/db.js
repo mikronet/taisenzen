@@ -264,6 +264,8 @@ async function initDb() {
     "ALTER TABLE tournaments ADD COLUMN current_round INTEGER DEFAULT 1",
     // Coreo: block structure — which categories go in each block and in what order
     "ALTER TABLE tournaments ADD COLUMN block_structure TEXT DEFAULT NULL",
+    // Coreo: music file per participant
+    "ALTER TABLE participants ADD COLUMN audio_path TEXT DEFAULT NULL",
   ];
   for (const sql of migrations) {
     try { db.run(sql); } catch (e) { /* column already exists */ }

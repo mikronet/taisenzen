@@ -106,7 +106,7 @@ function SaveStatus({ dirty, saved, savedMsg }) {
 }
 
 // ── Setup checklist ───────────────────────────────────────────────────────────
-function SetupChecklist({ criteria, categories, participants, judges, onNavigate }) {
+function SetupChecklist({ criteria, participants, judges, blockStructure, onNavigate }) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('coreoChecklistCollapsed') === '1');
 
   const toggle = () => setCollapsed(v => {
@@ -114,16 +114,14 @@ function SetupChecklist({ criteria, categories, participants, judges, onNavigate
     return !v;
   });
 
+  let parsedBlock = null;
+  try { parsedBlock = blockStructure ? JSON.parse(blockStructure) : null; } catch {}
+  const blockConfigured = Array.isArray(parsedBlock) && parsedBlock.length > 0 && parsedBlock.some(b => b.categories?.length > 0);
+
   const steps = [
     {
-      label: 'Define los bloques y categorías',
-      hint: '¿Cuántas partes tiene el evento y qué estilos van a competir?',
-      done: categories.length > 0,
-      tab: 'config',
-    },
-    {
       label: 'Configura los criterios de puntuación',
-      hint: '¿Qué van a valorar los jueces? Técnica, Expresión...',
+      hint: '¿Qué van a valorar los jueces? Técnica, Expresión, Musicalidad...',
       done: criteria.length > 0,
       tab: 'config',
     },
@@ -134,14 +132,20 @@ function SetupChecklist({ criteria, categories, participants, judges, onNavigate
       tab: 'config',
     },
     {
+      label: 'Define la estructura de bloques y categorías',
+      hint: 'En la pestaña Participantes, crea los bloques del evento y asigna categorías a cada uno.',
+      done: blockConfigured,
+      tab: 'participantes',
+    },
+    {
       label: 'Añade los participantes',
-      hint: 'Grupos, solos o parejas que van a actuar.',
+      hint: 'Grupos, solos o parejas — inscríbelos en su categoría y bloque correspondiente.',
       done: participants.length > 0,
       tab: 'participantes',
     },
     {
       label: 'Define el orden de actuación',
-      hint: 'Ajusta el orden en que saldrán al escenario.',
+      hint: 'En la pestaña Orden, arrastra para ajustar quién sale primero.',
       done: participants.length > 0 && participants.some(p => p.act_order != null),
       tab: 'orden',
     },
@@ -329,29 +333,6 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
     } finally { setSavingCriteria(false); }
   };
 
-  // ── Config dirty/saved state ──
-  const [configDirty, setConfigDirty] = useState(false);
-  const [configSaved, setConfigSaved] = useState(false);
-  const markConfigDirty = () => { setConfigDirty(true); setConfigSaved(false); };
-
-  // ── Rounds ──
-  const [rounds, setRounds] = useState(tournament.coreo_rounds || 1);
-  useEffect(() => { setRounds(tournament.coreo_rounds || 1); }, [tournament.coreo_rounds]);
-
-  // ── Save config ──
-  const [savingConfig, setSavingConfig] = useState(false);
-  const saveConfig = async () => {
-    setSavingConfig(true);
-    try {
-      const res = await apiFetch(`${API}/tournaments/${tournamentId}/config`, {
-        method: 'PUT', body: JSON.stringify({ rounds }),
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      onUpdateTournament({ coreo_rounds: data.coreo_rounds });
-      setConfigDirty(false); setConfigSaved(true);
-    } finally { setSavingConfig(false); }
-  };
 
   return (
     <>
@@ -373,37 +354,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
       {/* ── Left column: event config ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-        {/* Frame 1: Bloques */}
-        <div style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
-          <div style={{ padding: '12px 20px', background: 'rgba(126,207,255,0.04)', borderBottom: '1px solid rgba(126,207,255,0.1)' }}>
-            <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.15em' }}>BLOQUES</span>
-          </div>
-          <div style={{ padding: '20px' }}>
-            <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>NÚMERO DE BLOQUES</h3>
-            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>
-              Define cuántos bloques tiene el evento. Las categorías se asignan a cada bloque desde la pestaña <strong style={{ color: 'rgba(255,255,255,0.7)' }}>PARTICIPANTES</strong>.
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <input
-                type="number" min={1} max={20}
-                value={rounds}
-                onChange={e => { setRounds(Math.max(1, Number(e.target.value) || 1)); markConfigDirty(); }}
-                style={{ width: '80px' }}
-              />
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.85rem' }}>
-                {rounds === 1 ? '1 bloque' : `${rounds} bloques`}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '16px' }}>
-              <button onClick={saveConfig} className="btn-primary" disabled={savingConfig}>
-                {savingConfig ? 'Guardando...' : 'Guardar bloques'}
-              </button>
-              <SaveStatus dirty={configDirty} saved={configSaved} savedMsg="Bloques guardados" />
-            </div>
-          </div>
-        </div>
-
-        {/* Frame 2: Criterios */}
+        {/* Frame 1: Criterios */}
         <div style={{ border: '1px solid rgba(126,207,255,0.15)', borderRadius: '12px', overflow: 'hidden' }}>
           <div style={{ padding: '12px 20px', background: 'rgba(126,207,255,0.04)', borderBottom: '1px solid rgba(126,207,255,0.1)' }}>
             <span style={{ color: '#7ecfff', fontWeight: 700, fontSize: '0.78rem', letterSpacing: '0.15em' }}>CRITERIOS DE PUNTUACIÓN</span>
@@ -442,35 +393,40 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
         <div>
         <h3 style={{ color: '#7ecfff', marginBottom: '8px', letterSpacing: '0.1em', fontSize: '1rem' }}>CARTEL DEL TORNEO</h3>
         <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.85rem', marginBottom: '16px' }}>Imagen que aparece de fondo en la pantalla pública.</p>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', marginBottom: '8px' }}>
-          {tournament.poster_path ? (
-            <div style={{ position: 'relative', flexShrink: 0 }}>
+        {tournament.poster_path ? (
+          <div style={{ marginBottom: '10px' }}>
+            <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%' }}>
               <img
                 src={`/uploads/${tournament.poster_path}`}
                 alt="Cartel"
-                style={{ width: '120px', height: '160px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #2a2a3e', display: 'block' }}
+                style={{ display: 'block', maxWidth: '100%', maxHeight: '220px', width: 'auto', height: 'auto', objectFit: 'contain', borderRadius: '8px', border: '1px solid #2a2a3e', background: '#0a0a14' }}
               />
               <button
                 onClick={deletePoster}
-                style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.7)', border: '1px solid #444', color: '#888', borderRadius: '4px', padding: '2px 7px', cursor: 'pointer', fontSize: '0.75rem' }}
+                style={{ position: 'absolute', top: '6px', right: '6px', background: 'rgba(0,0,0,0.75)', border: '1px solid #444', color: '#aaa', borderRadius: '4px', padding: '2px 8px', cursor: 'pointer', fontSize: '0.75rem', lineHeight: 1.4 }}
               >✕</button>
             </div>
-          ) : (
-            <div
-              onClick={() => posterRef.current.click()}
-              style={{ width: '120px', height: '160px', borderRadius: '8px', border: '2px dashed #333', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', flexShrink: 0 }}
-            >
-              <span style={{ color: '#444', fontSize: '1.5rem' }}>🖼</span>
-              <span style={{ color: '#555', fontSize: '0.7rem', textAlign: 'center', lineHeight: 1.4 }}>Sin cartel</span>
+            <div style={{ marginTop: '10px' }}>
+              <button className="btn-secondary" style={{ fontSize: '0.8rem' }} disabled={posterUploading} onClick={() => posterRef.current.click()}>
+                {posterUploading ? 'Subiendo...' : 'Cambiar cartel'}
+              </button>
             </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'center' }}>
-            <button className="btn-secondary" style={{ fontSize: '0.8rem' }} disabled={posterUploading} onClick={() => posterRef.current.click()}>
-              {posterUploading ? 'Subiendo...' : tournament.poster_path ? 'Cambiar cartel' : 'Subir cartel'}
-            </button>
-            <input type="file" ref={posterRef} accept="image/*" onChange={handlePosterChange} style={{ display: 'none' }} />
           </div>
-        </div>
+        ) : (
+          <div
+            onClick={() => posterRef.current.click()}
+            style={{ width: '100%', height: '110px', borderRadius: '8px', border: '2px dashed #333', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '10px' }}
+          >
+            <span style={{ color: '#444', fontSize: '1.5rem' }}>🖼</span>
+            <span style={{ color: '#555', fontSize: '0.7rem' }}>Subir cartel</span>
+          </div>
+        )}
+        <input type="file" ref={posterRef} accept="image/*" onChange={handlePosterChange} style={{ display: 'none' }} />
+        {!tournament.poster_path && (
+          <button className="btn-secondary" style={{ fontSize: '0.8rem' }} disabled={posterUploading} onClick={() => posterRef.current.click()}>
+            {posterUploading ? 'Subiendo...' : 'Subir cartel'}
+          </button>
+        )}
         </div>{/* end poster div */}
       </div>{/* end left column */}
 
@@ -499,7 +455,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                 <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-judge?code=${j.access_code}`, label: `JURADO · ${j.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#7ecfff' }}>QR</button>
                 <button onClick={() => window.open(`${window.location.origin}/coreo-judge?code=${j.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#7ecfff' }}>🔗</button>
-                {isAdmin && <button className="btn-danger" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => removeJudge(j.id)}>Eliminar</button>}
+                {isAdmin && <button onClick={() => removeJudge(j.id)} style={{ background: 'none', border: '1px solid rgba(233,69,96,0.4)', color: '#e94560', borderRadius: '5px', padding: '3px 8px', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>×</button>}
               </div>
             </div>
           ))}
@@ -528,7 +484,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-organizer?code=${o.access_code}`, label: `ORGANIZADOR · ${o.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#a78bfa' }}>QR</button>
                   <button onClick={() => window.open(`${window.location.origin}/coreo-organizer?code=${o.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#a78bfa' }}>🔗</button>
-                  {o.access_code !== selfOrgCode && <button className="btn-danger" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => removeOrganizer(o.id)}>Eliminar</button>}
+                  {o.access_code !== selfOrgCode && <button onClick={() => removeOrganizer(o.id)} style={{ background: 'none', border: '1px solid rgba(233,69,96,0.4)', color: '#e94560', borderRadius: '5px', padding: '3px 8px', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>×</button>}
                 </div>
               </div>
             ))}
@@ -556,7 +512,7 @@ function ConfigTab({ tournamentId, criteria, onUpdateCriteria, tournament, onUpd
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <button onClick={() => setQrModal({ url: `${window.location.origin}/coreo-speaker?code=${s.access_code}`, label: `STAFF · ${s.name}` })} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#7ecfff' }}>QR</button>
                   <button onClick={() => window.open(`${window.location.origin}/coreo-speaker?code=${s.access_code}`, '_blank')} style={{ background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '5px 10px', cursor: 'pointer', fontSize: '0.82rem', color: '#7ecfff' }}>🔗</button>
-                  <button className="btn-danger" style={{ fontSize: '0.82rem', padding: '5px 12px' }} onClick={() => removeSpeaker(s.id)}>Eliminar</button>
+                  <button onClick={() => removeSpeaker(s.id)} style={{ background: 'none', border: '1px solid rgba(233,69,96,0.4)', color: '#e94560', borderRadius: '5px', padding: '3px 8px', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>×</button>
                 </div>
               </div>
             ))}
@@ -584,15 +540,27 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
   const [coreografo, setCoreografo] = useState(initial?.coreografo || '');
   const [photoFile, setPhotoFile] = useState(null);
   const [preview, setPreview] = useState(initial?.photo_path ? `/uploads/${initial.photo_path}` : null);
+  const [audioFile, setAudioFile] = useState(null);
+  const [audioName, setAudioName] = useState(initial?.audio_path || null);
+  const [removeAudio, setRemoveAudio] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef();
+  const audioRef = useRef();
 
   const handlePhoto = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setPhotoFile(file);
     setPreview(URL.createObjectURL(file));
+  };
+
+  const handleAudio = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setAudioFile(file);
+    setAudioName(file.name);
+    setRemoveAudio(false);
   };
 
   const handleSubmit = async (e) => {
@@ -602,13 +570,14 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
     try {
       const fd = new FormData();
       fd.append('name', name.trim());
-      // If context is provided, use it; otherwise use the form state
       fd.append('category', context ? context.category : category);
       fd.append('round_number', context ? context.round_number : roundNumber);
       fd.append('academia', academia.trim());
       fd.append('localidad', localidad.trim());
       fd.append('coreografo', coreografo.trim());
       if (photoFile) fd.append('photo', photoFile);
+      if (audioFile) fd.append('audio', audioFile);
+      if (removeAudio) fd.append('remove_audio', '1');
 
       const url = initial
         ? `${API}/participants/${initial.id}`
@@ -626,10 +595,10 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
   };
 
   const rounds = Math.max(1, Number(roundsCount) || 1);
+  const hasAudio = !removeAudio && (audioFile || audioName);
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Context badge — shown when category/block are pre-set */}
       {context && (
         <div style={{ padding: '8px 12px', background: 'rgba(126,207,255,0.07)', borderRadius: '6px', marginBottom: '2px', fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)' }}>
           <span style={{ color: '#7ecfff', fontWeight: 600 }}>Bloque {context.round_number}</span>
@@ -684,6 +653,33 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
         </div>
       </div>
 
+      {/* Row 3: Music */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'rgba(52,211,153,0.04)', border: '1px solid rgba(52,211,153,0.15)', borderRadius: '8px' }}>
+        <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem', letterSpacing: '0.1em', flexShrink: 0 }}>MÚSICA</span>
+        {hasAudio ? (
+          <>
+            <span style={{ flex: 1, fontSize: '0.8rem', color: '#34d399', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              🎵 {audioFile ? audioFile.name : audioName}
+            </span>
+            <button type="button" onClick={() => { audioRef.current.value = ''; setAudioFile(null); setAudioName(null); setRemoveAudio(true); }}
+              style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '0.85rem', padding: '2px 6px', flexShrink: 0 }}>✕</button>
+            <button type="button" onClick={() => audioRef.current.click()}
+              style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: '4px', padding: '3px 10px', cursor: 'pointer', fontSize: '0.75rem', flexShrink: 0 }}>
+              Cambiar
+            </button>
+          </>
+        ) : (
+          <>
+            <span style={{ flex: 1, fontSize: '0.8rem', color: 'rgba(255,255,255,0.2)' }}>Sin archivo de música</span>
+            <button type="button" onClick={() => audioRef.current.click()}
+              style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', color: '#34d399', borderRadius: '4px', padding: '4px 12px', cursor: 'pointer', fontSize: '0.78rem', flexShrink: 0 }}>
+              + Subir MP3
+            </button>
+          </>
+        )}
+        <input type="file" ref={audioRef} accept="audio/mpeg,audio/mp3,audio/aac,audio/wav,audio/ogg,.mp3,.aac,.wav,.ogg,.m4a" onChange={handleAudio} style={{ display: 'none' }} />
+      </div>
+
       {error && <p style={{ color: 'var(--accent)', fontSize: '0.85rem' }}>{error}</p>}
       <div style={{ display: 'flex', gap: '10px' }}>
         <button type="submit" className="btn-primary" disabled={loading}>
@@ -696,15 +692,32 @@ function ParticipantForm({ initial, onSave, onCancel, tournamentId, categories, 
 }
 
 // ── Block Structure Editor ─────────────────────────────────────────────────────
-function BlockStructureEditor({ tournamentId, roundsCount, initialStructure, onSaved }) {
-  const makeEmpty = () => Array.from({ length: roundsCount }, (_, i) => ({ round: i + 1, categories: [] }));
+function BlockStructureEditor({ tournamentId, initialRoundsCount, initialStructure, onSaved }) {
+  const makeEmpty = (count) => Array.from({ length: count }, (_, i) => ({ round: i + 1, categories: [] }));
 
+  const [roundsCount, setRoundsCount] = useState(initialRoundsCount || 1);
   const [blocks, setBlocks] = useState(() =>
-    initialStructure && initialStructure.length > 0 ? initialStructure : makeEmpty()
+    initialStructure && initialStructure.length > 0 ? initialStructure : makeEmpty(initialRoundsCount || 1)
   );
-  const [newCatInputs, setNewCatInputs] = useState(() => Array.from({ length: roundsCount }, () => ''));
+  const [newCatInputs, setNewCatInputs] = useState(() => Array.from({ length: initialRoundsCount || 1 }, () => ''));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const handleRoundsChange = (newCount) => {
+    newCount = Math.max(1, Math.min(20, newCount));
+    setRoundsCount(newCount);
+    setBlocks(prev => {
+      if (newCount > prev.length) {
+        return [...prev, ...Array.from({ length: newCount - prev.length }, (_, i) => ({ round: prev.length + i + 1, categories: [] }))];
+      }
+      return prev.slice(0, newCount);
+    });
+    setNewCatInputs(prev => {
+      if (newCount > prev.length) return [...prev, ...Array.from({ length: newCount - prev.length }, () => '')];
+      return prev.slice(0, newCount);
+    });
+    setSaved(false);
+  };
 
   // All category names across all blocks (for duplicate detection)
   const allCatNames = blocks.flatMap(b => b.categories);
@@ -745,11 +758,14 @@ function BlockStructureEditor({ tournamentId, roundsCount, initialStructure, onS
     const allCats = [...new Set(blocks.flatMap(b => b.categories))];
     setSaving(true);
     try {
+      await apiFetch(`/api/coreo/tournaments/${tournamentId}/config`, {
+        method: 'PUT', body: JSON.stringify({ rounds: roundsCount }),
+      });
       const res = await apiFetch(`/api/coreo/tournaments/${tournamentId}/block-structure`, {
         method: 'PUT',
         body: JSON.stringify({ block_structure: blocks, categories: allCats }),
       });
-      if (res.ok) { setSaved(true); onSaved(blocks, allCats); }
+      if (res.ok) { setSaved(true); onSaved(blocks, allCats, roundsCount); }
     } finally { setSaving(false); }
   };
 
@@ -760,8 +776,20 @@ function BlockStructureEditor({ tournamentId, roundsCount, initialStructure, onS
       <div style={{ marginBottom: '20px' }}>
         <h3 style={{ color: '#7ecfff', letterSpacing: '0.1em', fontSize: '0.9rem', margin: '0 0 6px' }}>ESTRUCTURA DE BLOQUES</h3>
         <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.78rem', margin: 0 }}>
-          Crea las categorías de cada bloque y ordénalas. Una vez guardado, podrás introducir participantes categoría por categoría.
+          Define cuántos bloques tiene el evento y las categorías de cada uno. Una vez guardado podrás introducir participantes categoría por categoría.
         </p>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', padding: '12px 16px', background: 'rgba(126,207,255,0.04)', border: '1px solid rgba(126,207,255,0.15)', borderRadius: '8px' }}>
+        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem', letterSpacing: '0.1em', flexShrink: 0 }}>NÚMERO DE BLOQUES</span>
+        <input
+          type="number" min={1} max={20}
+          value={roundsCount}
+          onChange={e => handleRoundsChange(Number(e.target.value) || 1)}
+          style={{ width: '64px', textAlign: 'center' }}
+        />
+        <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>
+          {roundsCount === 1 ? '1 bloque' : `${roundsCount} bloques`}
+        </span>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
@@ -845,6 +873,20 @@ function ParticipantsTab({ tournamentId, participants, onUpdate, categories, rou
     setEditing(null);
   }, [activeBlock, blockStructure]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ENTER key opens add-participant form
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Enter' && !showForm && !editing && activeCategory) {
+        const tag = document.activeElement?.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && tag !== 'BUTTON') {
+          setShowForm(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showForm, editing, activeCategory]);
+
   const handleSave = (p) => {
     if (p.id && participants.find(x => x.id === p.id)) {
       onUpdate(participants.map(x => x.id === p.id ? p : x));
@@ -867,10 +909,10 @@ function ParticipantsTab({ tournamentId, participants, onUpdate, categories, rou
       <div>
         <BlockStructureEditor
           tournamentId={tournamentId}
-          roundsCount={roundsCount}
+          initialRoundsCount={roundsCount}
           initialStructure={parsedStructure}
-          onSaved={(structure, cats) => {
-            onBlockStructureSave(structure, cats);
+          onSaved={(structure, cats, newRoundsCount) => {
+            onBlockStructureSave(structure, cats, newRoundsCount);
             setEditingStructure(false);
             const firstBlock = structure.find(b => b.round === activeBlock) || structure[0];
             setActiveCategory(firstBlock?.categories[0] ?? null);
@@ -1546,13 +1588,16 @@ function TimingWidget({ timing, tourTimer, setTourTimer, blockTimers, setBlockTi
   );
 }
 
-function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd, scoresRefreshTick, activeBlock, loadBlock, totalBlocks, tourTimer, setTourTimer, blockTimers, setBlockTimers }) {
+function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatus, staffThread, onStaffAdd, scoresRefreshTick, activeBlock, loadBlock, totalBlocks, tourTimer, setTourTimer, blockTimers, setBlockTimers, iframeCollapsed, setIframeCollapsed }) {
   const [loading, setLoading] = useState(null);
-  const [iframeCollapsed, setIframeCollapsed] = useState(false);
   const [nowMs, setNowMs] = useState(Date.now());
   // Local participant state (augments parent state with real-time timer fields)
   const [localParts, setLocalParts] = useState(participants);
   useEffect(() => { setLocalParts(participants); }, [participants]);
+
+  // Music control state
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicActive, setMusicActive] = useState(false); // true once play has been pressed at least once
 
   // Collapse state for blocks and categories
   const [collapsedBlocks, setCollapsedBlocks] = useState({});
@@ -1647,6 +1692,22 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
   const partIdxMap = Object.fromEntries(allSorted.map((p, i) => [p.id, i + 1]));
   const onStageP = localParts.find(p => p.on_stage);
 
+  // Reset music state when participant changes
+  useEffect(() => { setMusicPlaying(false); setMusicActive(false); }, [onStageP?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const musicPlay = async () => {
+    await apiFetch(`${API}/tournaments/${tournamentId}/music/play`, { method: 'POST', body: JSON.stringify({ position: musicActive ? undefined : 0 }) });
+    setMusicPlaying(true); setMusicActive(true);
+  };
+  const musicPause = async () => {
+    await apiFetch(`${API}/tournaments/${tournamentId}/music/pause`, { method: 'POST' });
+    setMusicPlaying(false);
+  };
+  const musicStop = async () => {
+    await apiFetch(`${API}/tournaments/${tournamentId}/music/stop`, { method: 'POST' });
+    setMusicPlaying(false); setMusicActive(false);
+  };
+
   // Auto-collapse: expand block+category of active participant (or next-in-line), collapse the rest
   useEffect(() => {
     // Determine the focal participant: on-stage first, else first idle (SIGUIENTE target)
@@ -1731,6 +1792,24 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', borderRight: iframeCollapsed ? 'none' : '1px solid #1a1a2e', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative' }}>
 
         <TimingWidget timing={timing} tourTimer={tourTimer} setTourTimer={setTourTimer} blockTimers={blockTimers} setBlockTimers={setBlockTimers} activeBlock={activeBlock} />
+
+        {/* ── Music control ── */}
+        {onStageP?.audio_path && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'rgba(52,211,153,0.05)', border: `1px solid ${musicPlaying ? 'rgba(52,211,153,0.45)' : 'rgba(52,211,153,0.18)'}`, borderRadius: '10px', transition: 'border-color 0.3s' }}>
+            <span style={{ fontSize: '0.88rem', lineHeight: 1 }}>🎵</span>
+            <span style={{ flex: 1, fontSize: '0.78rem', color: musicPlaying ? '#34d399' : 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', transition: 'color 0.3s' }}>
+              {musicPlaying ? 'Reproduciendo...' : musicActive ? 'Pausado' : onStageP.name}
+            </span>
+            <button onClick={musicPlaying ? musicPause : musicPlay}
+              style={{ background: musicPlaying ? 'rgba(52,211,153,0.15)' : 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.4)', color: '#34d399', borderRadius: '6px', padding: '5px 14px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 700 }}>
+              {musicPlaying ? '⏸' : '▶'}
+            </button>
+            <button onClick={musicStop} disabled={!musicActive}
+              style={{ background: 'none', border: '1px solid #333', color: musicActive ? '#888' : '#2a2a3e', borderRadius: '6px', padding: '5px 10px', cursor: musicActive ? 'pointer' : 'default', fontSize: '0.85rem' }}>
+              ⏹
+            </button>
+          </div>
+        )}
 
         {/* ── Block switcher ── */}
         {activeBlock !== null && totalBlocks > 1 && (
@@ -1899,19 +1978,6 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
           </div>
         </div>
 
-        {/* Collapse / expand toggle */}
-        <button
-          onClick={() => setIframeCollapsed(c => !c)}
-          title={iframeCollapsed ? 'Mostrar pantalla pública' : 'Ocultar pantalla pública'}
-          style={{
-            position: 'sticky', bottom: '16px', alignSelf: 'flex-end',
-            background: 'rgba(126,207,255,0.08)', border: '1px solid rgba(126,207,255,0.2)',
-            color: '#7ecfff', borderRadius: '6px', padding: '5px 10px',
-            cursor: 'pointer', fontSize: '0.72rem', letterSpacing: '0.08em',
-          }}
-        >
-          {iframeCollapsed ? '◀ Pantalla' : 'Pantalla ▶'}
-        </button>
       </div>
 
       {/* ── Right: public screen preview ── */}
@@ -2239,6 +2305,7 @@ export default function CoreoAdmin() {
   const [timing, setTiming] = useState(null);
   const [scoresRefreshTick, setScoresRefreshTick] = useState(0);
   const [tab, setTab] = useState('config');
+  const [iframeCollapsed, setIframeCollapsed] = useState(false);
   // Active block — server's current_round is the source of truth; starts at 1 and load() corrects it
   const [activeBlock, setActiveBlock] = useState(1);
   // Ref so load() and socket handlers can always read the latest activeBlock without stale closure
@@ -2553,7 +2620,7 @@ export default function CoreoAdmin() {
       </div>
 
       {/* Tab bar */}
-      <div style={{ background: '#0f0f1a', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: '2px', padding: '0 24px' }}>
+      <div style={{ background: '#0f0f1a', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: '2px', padding: '0 24px', alignItems: 'center' }}>
         {TABS.map(t => {
           const isActive = activeTab === t.key;
           const color = t.accent ? '#fb923c' : '#7ecfff';
@@ -2566,12 +2633,25 @@ export default function CoreoAdmin() {
               color: isActive ? color : t.accent ? 'rgba(251,146,60,0.5)' : 'rgba(255,255,255,0.4)',
               borderBottom: isActive ? `2px solid ${color}` : '2px solid transparent',
               transition: 'all 0.15s',
-              marginLeft: undefined,
             }}>
               {t.label}
             </button>
           );
         })}
+        {activeTab === 'en-vivo' && (
+          <button
+            onClick={() => setIframeCollapsed(c => !c)}
+            title={iframeCollapsed ? 'Mostrar pantalla pública' : 'Ocultar pantalla pública'}
+            style={{
+              marginLeft: 'auto', background: 'none',
+              border: '1px solid rgba(126,207,255,0.2)', color: 'rgba(126,207,255,0.5)',
+              borderRadius: '6px', padding: '4px 10px', cursor: 'pointer',
+              fontSize: '0.72rem', letterSpacing: '0.08em',
+            }}
+          >
+            {iframeCollapsed ? '◀ Pantalla' : 'Pantalla ▶'}
+          </button>
+        )}
       </div>
 
       {/* Puntuaciones tab: full-width outside the narrow container */}
@@ -2587,7 +2667,7 @@ export default function CoreoAdmin() {
           {isAdmin && tournament.status === 'setup' && (
             <SetupChecklist
               criteria={criteria}
-              categories={parsedCategories}
+              blockStructure={tournament?.block_structure}
               participants={participants}
               judges={judges}
               onNavigate={setTab}
@@ -2628,6 +2708,8 @@ export default function CoreoAdmin() {
           setTourTimer={setTourTimer}
           blockTimers={blockTimers}
           setBlockTimers={setBlockTimers}
+          iframeCollapsed={iframeCollapsed}
+          setIframeCollapsed={setIframeCollapsed}
         />
       )}
 
@@ -2636,7 +2718,7 @@ export default function CoreoAdmin() {
         {isAdmin && tournament.status === 'setup' && activeTab !== 'en-vivo' && activeTab !== 'puntuaciones' && (
           <SetupChecklist
             criteria={criteria}
-            categories={parsedCategories}
+            blockStructure={tournament?.block_structure}
             participants={participants}
             judges={judges}
             onNavigate={setTab}
@@ -2653,11 +2735,12 @@ export default function CoreoAdmin() {
             onBlockChange={loadBlock}
             totalBlocks={roundsCount}
             blockStructure={tournament?.block_structure}
-            onBlockStructureSave={(structure, cats) => {
+            onBlockStructureSave={(structure, cats, newRoundsCount) => {
               setTournament(prev => prev ? {
                 ...prev,
                 block_structure: JSON.stringify(structure),
                 ...(cats !== undefined && { coreo_categories: JSON.stringify(cats) }),
+                ...(newRoundsCount !== undefined && { coreo_rounds: newRoundsCount }),
               } : prev);
             }}
           />
