@@ -1987,7 +1987,7 @@ function LiveTab({ tournamentId, participants, onUpdate, timing, tournamentStatu
           <button onClick={() => window.open(`/coreo-screen/${tournamentId}`, '_blank')} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid #2a2a3e', color: '#666', fontSize: '0.62rem', padding: '3px 8px', borderRadius: '4px', cursor: 'pointer' }}>⤢ Abrir</button>
         </div>
         <iframe
-          src={`/coreo-screen/${tournamentId}`}
+          src={`/coreo-screen/${tournamentId}?embed=1`}
           style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
           title="Pantalla pública"
         />

@@ -121,12 +121,17 @@ function categoryColor(cat) {
   return '#94a3b8';
 }
 
+const IDLE_EFFECTS = ['sweep-h', 'sweep-v', 'pulse-ring', 'scanline', 'corner-burst'];
+
 export default function CoreoScreen() {
   const { id } = useParams();
+  const isEmbed = new URLSearchParams(window.location.search).get('embed') === '1';
   const socket = useSocket();
   const [onStage, setOnStage] = useState(null);
   const [tournamentInfo, setTournamentInfo] = useState({ name: '', poster_path: null });
   const [sweepKey, setSweepKey] = useState(0);
+  const [idleEffect, setIdleEffect] = useState({ key: 0, type: null });
+  const idleEffectIdx = useRef(0);
 
   // Audio
   const audioRef = useRef(null);
@@ -198,6 +203,18 @@ export default function CoreoScreen() {
     };
   }, [socket, id, audioEnabled]);
 
+  // Periodic idle effects — only while no one is on stage
+  useEffect(() => {
+    if (onStage) return;
+    const fire = () => {
+      idleEffectIdx.current = (idleEffectIdx.current + 1) % IDLE_EFFECTS.length;
+      setIdleEffect(prev => ({ key: prev.key + 1, type: IDLE_EFFECTS[idleEffectIdx.current] }));
+    };
+    const init = setTimeout(fire, 2500);
+    const interval = setInterval(fire, 7000);
+    return () => { clearTimeout(init); clearInterval(interval); };
+  }, [onStage]);
+
   const catColor = onStage ? categoryColor(onStage.category) : '#7ecfff';
 
   return (
@@ -207,8 +224,9 @@ export default function CoreoScreen() {
       {/* Hidden audio element */}
       <audio ref={audioRef} preload="auto" style={{ display: 'none' }} onEnded={() => setMusicState('idle')} />
 
-      {/* Audio enable banner — shown until user taps screen */}
-      {!audioEnabled && (
+
+      {/* Audio enable banner — solo en el iframe del admin */}
+      {isEmbed && !audioEnabled && (
         <div style={{
           position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
           zIndex: 10, background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(52,211,153,0.4)',
@@ -271,6 +289,58 @@ export default function CoreoScreen() {
           from { opacity: 0; transform: scale(1.08); letter-spacing: 0.25em; }
           to   { opacity: 1; transform: scale(1);    letter-spacing: 0.12em; }
         }
+        @keyframes poster-cycle {
+          0%   { transform: scale(1);     filter: brightness(0.97); box-shadow: 0 12px 80px rgba(0,0,0,0.85); }
+          /* — glow burst — */
+          12%  { transform: scale(1);     filter: brightness(0.97); box-shadow: 0 12px 80px rgba(0,0,0,0.85); }
+          17%  { transform: scale(1.030); filter: brightness(1.08); box-shadow: 0 0 60px rgba(167,139,250,0.8), 0 0 120px rgba(167,139,250,0.4), 0 16px 80px rgba(0,0,0,0.7); }
+          24%  { transform: scale(1);     filter: brightness(0.97); box-shadow: 0 12px 80px rgba(0,0,0,0.85); }
+          /* — pause — */
+          42%  { transform: scale(1);     filter: brightness(0.97); box-shadow: 0 12px 80px rgba(0,0,0,0.85); }
+          /* — zoom in — */
+          50%  { transform: scale(1.045); filter: brightness(1.05); box-shadow: 0 20px 100px rgba(126,207,255,0.45), 0 0 80px rgba(126,207,255,0.2); }
+          58%  { transform: scale(1);     filter: brightness(0.97); box-shadow: 0 12px 80px rgba(0,0,0,0.85); }
+          /* — pause — */
+          100% { transform: scale(1);     filter: brightness(0.97); box-shadow: 0 12px 80px rgba(0,0,0,0.85); }
+        }
+        @keyframes poster-shine {
+          0%   { transform: translateX(-180%); opacity: 0; }
+          62%  { transform: translateX(-180%); opacity: 0; }
+          65%  { opacity: 0; }
+          72%  { opacity: 1; }
+          80%  { transform: translateX(280%);  opacity: 0.6; }
+          82%  { opacity: 0; transform: translateX(280%); }
+          100% { opacity: 0; transform: translateX(280%); }
+        }
+        @keyframes idle-sweep-h {
+          0%   { opacity: 0; transform: translateX(-110%); }
+          12%  { opacity: 1; }
+          88%  { opacity: 1; }
+          100% { opacity: 0; transform: translateX(110%); }
+        }
+        @keyframes idle-sweep-v {
+          0%   { opacity: 0; transform: translateY(-110%); }
+          12%  { opacity: 1; }
+          88%  { opacity: 1; }
+          100% { opacity: 0; transform: translateY(110%); }
+        }
+        @keyframes idle-pulse-ring {
+          0%   { opacity: 0.7; transform: translate(-50%, -50%) scale(0); }
+          60%  { opacity: 0.4; }
+          100% { opacity: 0;   transform: translate(-50%, -50%) scale(1); }
+        }
+        @keyframes idle-scanline {
+          0%   { top: -6px; opacity: 0; }
+          8%   { opacity: 1; }
+          92%  { opacity: 0.9; }
+          100% { top: 100vh; opacity: 0; }
+        }
+        @keyframes idle-corner-burst {
+          0%   { opacity: 0; transform: scale(0.5); }
+          25%  { opacity: 1; }
+          75%  { opacity: 0.6; }
+          100% { opacity: 0; transform: scale(1.4); }
+        }
       `}</style>
 
       {/* Poster background blur */}
@@ -304,14 +374,99 @@ export default function CoreoScreen() {
         }} />
       )}
 
+      {/* ── Periodic idle effects ── */}
+      {!onStage && idleEffect.type && (() => {
+        const k = idleEffect.key;
+        const t = idleEffect.type;
+        if (t === 'sweep-h') return (
+          <div key={k} style={{
+            position: 'fixed', inset: 0, zIndex: 4, pointerEvents: 'none', overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute', top: 0, bottom: 0, width: '45%',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(167,139,250,0.18) 30%, rgba(255,255,255,0.28) 50%, rgba(126,207,255,0.18) 70%, transparent 100%)',
+              animation: 'idle-sweep-h 1.6s cubic-bezier(0.4,0,0.6,1) forwards',
+            }} />
+          </div>
+        );
+        if (t === 'sweep-v') return (
+          <div key={k} style={{
+            position: 'fixed', inset: 0, zIndex: 4, pointerEvents: 'none', overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute', left: 0, right: 0, height: '40%',
+              background: 'linear-gradient(180deg, transparent 0%, rgba(52,211,153,0.14) 25%, rgba(255,255,255,0.22) 50%, rgba(52,211,153,0.14) 75%, transparent 100%)',
+              animation: 'idle-sweep-v 1.8s cubic-bezier(0.4,0,0.6,1) forwards',
+            }} />
+          </div>
+        );
+        if (t === 'pulse-ring') return (
+          <div key={k} style={{
+            position: 'fixed', inset: 0, zIndex: 4, pointerEvents: 'none', overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute', left: '50%', top: '50%',
+              width: '80vmax', height: '80vmax',
+              border: '2px solid rgba(255,255,255,0.35)',
+              borderRadius: '50%',
+              boxShadow: '0 0 40px rgba(167,139,250,0.4), inset 0 0 40px rgba(167,139,250,0.15)',
+              animation: 'idle-pulse-ring 2s cubic-bezier(0,0,0.4,1) forwards',
+            }} />
+          </div>
+        );
+        if (t === 'scanline') return (
+          <div key={k} style={{
+            position: 'fixed', inset: 0, zIndex: 4, pointerEvents: 'none', overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute', left: 0, right: 0, height: '6px',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(126,207,255,0.5) 20%, rgba(255,255,255,0.9) 50%, rgba(126,207,255,0.5) 80%, transparent 100%)',
+              boxShadow: '0 0 20px rgba(126,207,255,0.8), 0 0 60px rgba(126,207,255,0.4)',
+              animation: 'idle-scanline 1.4s linear forwards',
+            }} />
+          </div>
+        );
+        if (t === 'corner-burst') return (
+          <div key={k} style={{
+            position: 'fixed', inset: 0, zIndex: 4, pointerEvents: 'none',
+          }}>
+            {[
+              { top: '-15%', left: '-15%', bg: 'rgba(233,69,96,0.22)' },
+              { top: '-15%', right: '-15%', bg: 'rgba(251,146,60,0.18)' },
+              { bottom: '-15%', left: '-15%', bg: 'rgba(167,139,250,0.20)' },
+              { bottom: '-15%', right: '-15%', bg: 'rgba(52,211,153,0.18)' },
+            ].map((pos, i) => (
+              <div key={i} style={{
+                position: 'absolute', ...pos,
+                width: '55vmax', height: '55vmax', borderRadius: '50%',
+                background: `radial-gradient(circle, ${pos.bg} 0%, transparent 65%)`,
+                animation: `idle-corner-burst 2.2s ease-out ${i * 0.08}s forwards`,
+              }} />
+            ))}
+          </div>
+        );
+        return null;
+      })()}
+
       {!onStage ? (
         // ── IDLE ──────────────────────────────────────────────────────────────
         <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '36px' }}>
 
           {tournamentInfo.poster_path && (
-            <img src={`/uploads/${tournamentInfo.poster_path}`} alt="Cartel"
-              style={{ maxHeight: 'clamp(300px, 55vh, 640px)', maxWidth: 'clamp(300px, 60vw, 900px)', objectFit: 'contain', borderRadius: '14px', boxShadow: '0 12px 80px rgba(0,0,0,0.85)', filter: 'brightness(0.97)' }}
-            />
+            <div style={{ position: 'relative', display: 'inline-block', lineHeight: 0 }}>
+              <img src={`/uploads/${tournamentInfo.poster_path}`} alt="Cartel"
+                style={{ maxHeight: 'clamp(300px, 55vh, 640px)', maxWidth: 'clamp(300px, 60vw, 900px)', objectFit: 'contain', borderRadius: '14px', display: 'block',
+                  animation: 'poster-cycle 20s ease-in-out infinite' }}
+              />
+              {/* Shine sweep overlay */}
+              <div style={{ position: 'absolute', inset: 0, borderRadius: '14px', overflow: 'hidden', pointerEvents: 'none' }}>
+                <div style={{
+                  position: 'absolute', top: 0, bottom: 0, width: '35%',
+                  background: 'linear-gradient(105deg, transparent 0%, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0.32) 50%, rgba(255,255,255,0.12) 60%, transparent 100%)',
+                  animation: 'poster-shine 20s ease-in-out infinite',
+                }} />
+              </div>
+            </div>
           )}
 
           <p style={{
