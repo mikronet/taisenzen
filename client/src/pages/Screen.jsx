@@ -589,43 +589,57 @@ export default function Screen() {
         >
           {tournament?.name || 'TAISEN'}
         </h1>
-        {/* Global timer inline — 7toSmoke */}
-        {is7toSmoke && globalTimerState.status !== 'idle' && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
-            padding: '4px 16px', borderRadius: '8px',
-            background: globalTimerFinished ? 'rgba(198,40,40,0.2)' : 'rgba(255,215,0,0.08)',
-            border: `1px solid ${globalTimerFinished ? 'rgba(198,40,40,0.5)' : 'rgba(255,215,0,0.25)'}`,
-          }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '3px' }}>
-              TIEMPO
-            </span>
-            <span style={{
-              fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 2.5vw, 2rem)', letterSpacing: '3px',
-              color: globalTimerFinished ? '#ef5350' : globalTimerState.status === 'paused' ? 'var(--gold)' : '#fff',
-            }}>
-              {globalTimerDisplay}
-            </span>
-            {globalTimerFinished && (
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', color: '#ef5350', letterSpacing: '3px', animation: 'pulse-badge 1s infinite' }}>
-                ¡TIEMPO!
-              </span>
-            )}
-            {globalTimerState.status === 'paused' && !globalTimerFinished && (
-              <span style={{ fontSize: '0.6rem', color: '#888', letterSpacing: '2px' }}>PAUSADO</span>
-            )}
-          </div>
+        {(phaseName || (is7toSmoke && globalTimerState.status !== 'idle')) && (
+          <>
+            <style>{`
+              @keyframes phase-glow {
+                0%, 100% { text-shadow: 0 0 18px rgba(255,215,0,0.45), 0 0 40px rgba(255,215,0,0.15); }
+                50%       { text-shadow: 0 0 32px rgba(255,215,0,0.75), 0 0 70px rgba(255,215,0,0.3); }
+              }
+            `}</style>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+              {/* Global timer — 7toSmoke, left of phase name */}
+              {is7toSmoke && globalTimerState.status !== 'idle' && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '4px 16px', borderRadius: '8px',
+                  background: globalTimerFinished ? 'rgba(198,40,40,0.2)' : 'rgba(255,215,0,0.08)',
+                  border: `1px solid ${globalTimerFinished ? 'rgba(198,40,40,0.5)' : 'rgba(255,215,0,0.25)'}`,
+                }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '3px' }}>
+                    TIEMPO
+                  </span>
+                  <span style={{
+                    fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 2.5vw, 2rem)', letterSpacing: '3px',
+                    color: globalTimerFinished ? '#ef5350' : globalTimerState.status === 'paused' ? 'var(--gold)' : '#fff',
+                  }}>
+                    {globalTimerDisplay}
+                  </span>
+                  {globalTimerFinished && (
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', color: '#ef5350', letterSpacing: '3px', animation: 'pulse-badge 1s infinite' }}>
+                      ¡TIEMPO!
+                    </span>
+                  )}
+                  {globalTimerState.status === 'paused' && !globalTimerFinished && (
+                    <span style={{ fontSize: '0.6rem', color: '#888', letterSpacing: '2px' }}>PAUSADO</span>
+                  )}
+                </div>
+              )}
+              {phaseName && (
+                <span style={{
+                  fontFamily: 'var(--font-display)',
+                  fontSize: 'clamp(1.4rem, 2.5vw, 2.2rem)',
+                  color: 'var(--gold)',
+                  letterSpacing: '5px',
+                  textTransform: 'uppercase',
+                  animation: 'phase-glow 3s ease-in-out infinite',
+                }}>
+                  {phaseName}
+                </span>
+              )}
+            </div>
+          </>
         )}
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          {phaseName && (
-            <span className="badge badge-phase" style={{ fontSize: '1.2rem', padding: '8px 20px' }}>
-              {phaseName}
-            </span>
-          )}
-          <span className={`badge badge-state badge-state-${stateClass}`} style={{ fontSize: '1.2rem', padding: '8px 20px' }}>
-            {stateLabel}
-          </span>
-        </div>
       </div>
 
       {/* === PREPARE overlay — shown when PREPARAR is pressed === */}
@@ -729,68 +743,55 @@ export default function Screen() {
         if (n <= 4) {
           // Public screen (horizontal mirror): N=2 side-by-side; N=3 TR/BR/BL; N=4 TR/BR/BL/TL
           const PUBLIC_CCW = n === 2 ? [
-            { gridRow: 1, gridColumn: 1 },  // P1: left
-            { gridRow: 1, gridColumn: 2 },  // P2: right
+            { gridRow: 1, gridColumn: 1 },
+            { gridRow: 1, gridColumn: 2 },
           ] : n === 3 ? [
-            { gridRow: 1, gridColumn: 2 },  // P1: TR
-            { gridRow: 2, gridColumn: 2 },  // P2: BR
-            { gridRow: 2, gridColumn: 1 },  // P3: BL
+            { gridRow: 1, gridColumn: 2 },
+            { gridRow: 2, gridColumn: 2 },
+            { gridRow: 2, gridColumn: 1 },
           ] : [
-            { gridRow: 1, gridColumn: 2 },  // P1: TR
-            { gridRow: 2, gridColumn: 2 },  // P2: BR
-            { gridRow: 2, gridColumn: 1 },  // P3: BL
-            { gridRow: 1, gridColumn: 1 },  // P4: TL
+            { gridRow: 1, gridColumn: 2 },
+            { gridRow: 2, gridColumn: 2 },
+            { gridRow: 2, gridColumn: 1 },
+            { gridRow: 1, gridColumn: 1 },
           ];
+          // Uniform font size: driven by the longest name so all names share the same size
+          const longestLen = Math.max(1, ...liveMatch.participants.map(p => p.name.length));
+          const fontSize = n === 1
+            ? `min(${(41 / longestLen).toFixed(1)}vw, 22vh)`
+            : n >= 3
+              ? `min(${(82 / longestLen).toFixed(1)}vw, 38vh)`
+              : `min(${(82 / longestLen).toFixed(1)}vw, 42vh)`;
+
+          if (n === 1) {
+            return (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1, textAlign: 'center' }}>
+                  {liveMatch.participants[0].name}
+                </span>
+              </div>
+            );
+          }
+
           return (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '24px 40px', width: '100%' }}>
-              <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1rem, 2vw, 1.6rem)', color: 'var(--gold)', letterSpacing: '4px', marginBottom: '20px', textTransform: 'uppercase' }}>
-                FILTROS — Ronda en curso
-              </p>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gridTemplateRows: 'auto auto',
-                gap: 'clamp(12px, 2vw, 24px) clamp(20px, 4vw, 60px)',
-                width: '100%',
-                maxWidth: '1200px',
-              }}>
+            <div style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: n >= 3 ? '1fr 1fr' : '1fr', minHeight: 0 }}>
                 {liveMatch.participants.map((p, idx) => {
-                  const pos = PUBLIC_CCW[idx] || { gridRow: 'auto', gridColumn: 'auto' };
-                  const is2v2 = p.member1_name || p.member2_name;
-                  return (
-                    <div key={p.id} style={{
-                      gridRow: pos.gridRow, gridColumn: pos.gridColumn,
-                      padding: 'clamp(14px, 2.5vw, 28px)',
-                      background: 'rgba(255,255,255,0.03)',
-                      borderRadius: 'var(--radius)',
-                      border: '1px solid #333',
-                      display: 'flex', flexDirection: 'column', gap: '6px',
-                    }}>
-                      <span style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: 'clamp(2rem, 4.5vw, 4rem)',
-                        color: 'var(--text)',
-                        letterSpacing: '1px',
-                        lineHeight: 1.1,
-                      }}>{p.name}</span>
-                      {is2v2 && p.member1_name && (
-                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(0.9rem, 1.8vw, 1.5rem)', color: 'var(--text-muted)' }}>{p.member1_name}</span>
-                      )}
-                      {is2v2 && p.member2_name && (
-                        <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(0.9rem, 1.8vw, 1.5rem)', color: 'var(--text-muted)' }}>{p.member2_name}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="vote-dots" style={{ gap: '14px', marginTop: '28px' }}>
-                {Array.from({ length: voteCount.totalJudges }, (_, i) => (
-                  <div key={i} className={`vote-dot ${i < voteCount.totalVotes ? 'voted' : ''}`} style={{ width: '28px', height: '28px' }} />
-                ))}
-              </div>
-              <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '1.1rem', marginTop: '10px' }}>
-                Puntuaciones: {voteCount.totalVotes}/{voteCount.totalJudges}
-              </p>
+                const pos = PUBLIC_CCW[idx] || { gridRow: 'auto', gridColumn: 'auto' };
+                const is2v2 = p.member1_name || p.member2_name;
+                return (
+                  <div key={p.id} style={{ gridRow: pos.gridRow, gridColumn: pos.gridColumn, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(10px, 2vw, 28px)' }}>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1, textAlign: 'center' }}>
+                      {p.name}
+                    </span>
+                    {is2v2 && (p.member1_name || p.member2_name) && (
+                      <div style={{ display: 'flex', gap: '14px', marginTop: '8px' }}>
+                        {p.member1_name && <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(0.9rem, 1.8vw, 1.6rem)', color: 'var(--text-muted)' }}>{p.member1_name}</span>}
+                        {p.member2_name && <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(0.9rem, 1.8vw, 1.6rem)', color: 'var(--text-muted)' }}>{p.member2_name}</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         }
@@ -835,14 +836,6 @@ export default function Screen() {
                 </div>
               ))}
             </div>
-            <div className="vote-dots" style={{ gap: '14px', marginTop: '32px' }}>
-              {Array.from({ length: voteCount.totalJudges }, (_, i) => (
-                <div key={i} className={`vote-dot ${i < voteCount.totalVotes ? 'voted' : ''}`} style={{ width: '28px', height: '28px' }} />
-              ))}
-            </div>
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '1.1rem', marginTop: '10px' }}>
-              Puntuaciones: {voteCount.totalVotes}/{voteCount.totalJudges}
-            </p>
           </div>
         );
       })()}
@@ -921,11 +914,6 @@ export default function Screen() {
                 <div className="versus-name" style={{ color: 'var(--text)', fontSize: 'clamp(2.5rem, 5vw, 5rem)' }}>
                   {liveMatch.participant2_name}
                 </div>
-              </div>
-              <div className="vote-dots" style={{ gap: '14px', marginTop: '10px' }}>
-                {Array.from({ length: voteCount.totalJudges }, (_, i) => (
-                  <div key={i} className={`vote-dot ${i < voteCount.totalVotes ? 'voted' : ''}`} style={{ width: '26px', height: '26px' }} />
-                ))}
               </div>
             </div>
           ) : !prepareMatch && (
@@ -1012,37 +1000,79 @@ export default function Screen() {
       )}
 
       {/* === ELIMINATION MODE: Live VS display === */}
-      {liveMatch && liveMatch.phase_type !== 'filtros' && liveMatch.phase_type !== '7tosmoke' && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <style>{`
-            @keyframes slide-from-left {
-              from { opacity: 0; transform: translateX(-80px); }
-              to   { opacity: 1; transform: translateX(0); }
-            }
-            @keyframes slide-from-right {
-              from { opacity: 0; transform: translateX(80px); }
-              to   { opacity: 1; transform: translateX(0); }
-            }
-            @keyframes vs-pop {
-              from { opacity: 0; transform: scale(0.5); }
-              to   { opacity: 1; transform: scale(1); }
-            }
-          `}</style>
-          <div key={liveMatch.id} className="versus-display" style={{ padding: '40px 20px' }}>
-            <div className="versus-name" style={{ color: 'var(--text)', fontSize: 'clamp(3rem, 7vw, 6rem)', animation: 'slide-from-right 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}>{liveMatch.participant1_name}</div>
-            <div className="versus-vs" style={{ fontSize: 'clamp(2.5rem, 5vw, 5rem)', animation: 'vs-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both' }}>VS</div>
-            <div className="versus-name" style={{ color: 'var(--text)', fontSize: 'clamp(3rem, 7vw, 6rem)', animation: 'slide-from-left 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}>{liveMatch.participant2_name}</div>
+      {liveMatch && liveMatch.phase_type !== 'filtros' && liveMatch.phase_type !== '7tosmoke' && (() => {
+        const ps = [];
+        if (liveMatch.participant1_name) ps.push({ id: 'p1', name: liveMatch.participant1_name });
+        if (liveMatch.participant2_name) ps.push({ id: 'p2', name: liveMatch.participant2_name });
+        if (ps.length === 0) return null;
+        const longestLen = Math.max(1, ...ps.map(p => p.name.length));
+        const fontSize = ps.length === 1
+          ? `min(${(41 / longestLen).toFixed(1)}vw, 22vh)`
+          : `min(${(82 / longestLen).toFixed(1)}vw, 42vh)`;
+        if (ps.length === 1) {
+          return (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1 }}>
+                {ps[0].name}
+              </span>
+            </div>
+          );
+        }
+        return (
+          <div key={liveMatch.id} style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr', minHeight: 0 }}>
+            <style>{`
+              @keyframes slide-from-left {
+                from { opacity: 0; transform: translateX(-60px); }
+                to   { opacity: 1; transform: translateX(0); }
+              }
+              @keyframes slide-from-right {
+                from { opacity: 0; transform: translateX(60px); }
+                to   { opacity: 1; transform: translateX(0); }
+              }
+              @keyframes vs-pop {
+                from { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+                to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+              }
+              @keyframes fire-flicker {
+                0%,100% { transform: translate(-50%,-50%) scaleY(1)   scaleX(1);    opacity: 1;    filter: blur(8px); }
+                25%     { transform: translate(-50%,-50%) scaleY(1.08) scaleX(0.94); opacity: 0.85; filter: blur(10px); }
+                50%     { transform: translate(-50%,-50%) scaleY(0.95) scaleX(1.05); opacity: 1;    filter: blur(7px); }
+                75%     { transform: translate(-50%,-50%) scaleY(1.05) scaleX(0.97); opacity: 0.9;  filter: blur(9px); }
+              }
+              @keyframes fire-flicker2 {
+                0%,100% { transform: translate(-50%,-50%) scaleY(1)    scaleX(1);    opacity: 0.6;  filter: blur(14px); }
+                33%     { transform: translate(-50%,-50%) scaleY(1.12)  scaleX(0.92); opacity: 0.45; filter: blur(18px); }
+                66%     { transform: translate(-50%,-50%) scaleY(0.92)  scaleX(1.08); opacity: 0.65; filter: blur(12px); }
+              }
+              @keyframes vs-glow-pulse {
+                0%,100% { text-shadow: 0 0 20px #ff6a00, 0 0 40px #ff4500, 0 0 70px rgba(255,69,0,0.5); }
+                50%     { text-shadow: 0 0 30px #ffb347, 0 0 60px #ff6a00, 0 0 100px rgba(255,69,0,0.7); }
+              }
+              .vs-fire-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); zIndex: 10; }
+            `}</style>
+            <div style={{ gridRow: 1, gridColumn: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(12px, 2vw, 32px)' }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1, textAlign: 'center', animation: 'slide-from-left 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}>
+                {liveMatch.participant1_name}
+              </span>
+            </div>
+            <div style={{ gridRow: 1, gridColumn: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(12px, 2vw, 32px)' }}>
+              <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1, textAlign: 'center', animation: 'slide-from-right 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}>
+                {liveMatch.participant2_name}
+              </span>
+            </div>
+            {/* VS with fire effect */}
+            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 10, animation: 'vs-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both' }}>
+              {/* Fire glow layers */}
+              <div style={{ position: 'absolute', top: '50%', left: '50%', width: '2.2em', height: '2.2em', borderRadius: '50%', background: 'radial-gradient(ellipse at 50% 70%, #ff6a00 0%, #ff4500 35%, transparent 70%)', animation: 'fire-flicker 0.9s ease-in-out infinite', pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', top: '50%', left: '50%', width: '3em', height: '3em', borderRadius: '50%', background: 'radial-gradient(ellipse at 50% 65%, rgba(255,140,0,0.5) 0%, rgba(255,69,0,0.25) 45%, transparent 70%)', animation: 'fire-flicker2 1.3s ease-in-out infinite', pointerEvents: 'none' }} />
+              {/* VS text */}
+              <span style={{ position: 'relative', fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 5rem)', color: '#fff', letterSpacing: '4px', lineHeight: 1, animation: 'vs-glow-pulse 1.4s ease-in-out infinite' }}>
+                VS
+              </span>
+            </div>
           </div>
-          <div className="vote-dots" style={{ gap: '18px', marginTop: '30px' }}>
-            {Array.from({ length: voteCount.totalJudges }, (_, i) => (
-              <div key={i} className={`vote-dot ${i < voteCount.totalVotes ? 'voted' : ''}`} style={{ width: '32px', height: '32px' }} />
-            ))}
-          </div>
-          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '1.3rem', marginTop: '14px' }}>
-            Votos: {voteCount.totalVotes}/{voteCount.totalJudges}
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* === Bracket (only for bracket tournaments, no live match) === */}
       {!liveMatch && !showFiltrosRanking && !prepareMatch && !isFiltrosActive && !isSmokeActive && phases.length > 0 && (
@@ -1087,6 +1117,32 @@ export default function Screen() {
       )}
 
       {/* Ticker bar — visible when a message is set and no match is in progress (PREPARACIÓN state) */}
+      {/* Vote indicator — fixed bottom-left, subtle dots only */}
+      {liveMatch && voteCount.totalJudges > 0 && (
+        <div style={{
+          position: 'fixed', bottom: '22px', left: '24px',
+          display: 'flex', gap: '7px', alignItems: 'center', zIndex: 50,
+        }}>
+          {Array.from({ length: voteCount.totalJudges }, (_, i) => {
+            const allVoted = voteCount.totalVotes >= voteCount.totalJudges;
+            const voted = i < voteCount.totalVotes;
+            return (
+              <div key={i} style={{
+                width: '9px', height: '9px', borderRadius: '50%',
+                transition: 'background 0.3s, box-shadow 0.3s',
+                background: voted
+                  ? (allVoted ? '#4caf50' : '#e94560')
+                  : 'rgba(255,255,255,0.12)',
+                border: voted ? 'none' : '1px solid rgba(255,255,255,0.18)',
+                boxShadow: voted
+                  ? (allVoted ? '0 0 5px rgba(76,175,80,0.6)' : '0 0 5px rgba(233,69,96,0.6)')
+                  : 'none',
+              }} />
+            );
+          })}
+        </div>
+      )}
+
       {ticker && !liveMatch && tournament.status !== 'finished' && (
         <>
           <style>{`

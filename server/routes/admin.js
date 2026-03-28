@@ -178,26 +178,27 @@ router.post('/tournaments/:id/participants', (req, res) => {
     const tournament = db.prepare('SELECT * FROM tournaments WHERE id = ?').get(tid);
     const groupSize = tournament.group_size || 2;
 
-    // Find the last pending round that still has room
-    const lastPendingRound = db.prepare(`
+    // Find the first pending round that still has room (fills rounds in sequential order)
+    const firstIncompleteRound = db.prepare(`
       SELECT m.id, m.match_order, COUNT(mp.participant_id) as participant_count
       FROM matches m
       LEFT JOIN match_participants mp ON m.id = mp.match_id
       WHERE m.phase_id = ? AND m.status = 'pending'
       GROUP BY m.id
-      ORDER BY m.match_order DESC
+      HAVING COUNT(mp.participant_id) < ?
+      ORDER BY m.match_order ASC
       LIMIT 1
-    `).get(filtrosPhase.id);
+    `).get(filtrosPhase.id, groupSize);
 
     let targetMatchId;
     let nextPosition;
 
-    if (lastPendingRound && lastPendingRound.participant_count < groupSize) {
-      // There's room in the last pending round — add there
-      targetMatchId = lastPendingRound.id;
-      nextPosition = lastPendingRound.participant_count + 1;
+    if (firstIncompleteRound) {
+      // There's room in an earlier pending round — fill it first
+      targetMatchId = firstIncompleteRound.id;
+      nextPosition = firstIncompleteRound.participant_count + 1;
     } else {
-      // Last round is full (or no pending rounds exist) — create a new round
+      // All pending rounds are full (or no pending rounds exist) — create a new round
       const maxOrderRow = db.prepare('SELECT MAX(match_order) as maxOrder FROM matches WHERE phase_id = ?').get(filtrosPhase.id);
       const newOrder = (maxOrderRow.maxOrder || 0) + 1;
       const newMatchResult = db.prepare(
@@ -225,10 +226,61 @@ router.get('/tournaments/:id/participants', (req, res) => {
 });
 
 router.delete('/participants/:id', (req, res) => {
-  const p = db.prepare('SELECT * FROM participants WHERE id = ?').get(Number(req.params.id));
+  const pid = Number(req.params.id);
+  const p = db.prepare('SELECT * FROM participants WHERE id = ?').get(pid);
   if (!p) return res.status(404).json({ error: 'No encontrado' });
-  db.prepare('DELETE FROM participants WHERE id = ?').run(Number(req.params.id));
-  req.io.to(`screen:${p.tournament_id}`).emit('participant:removed', p);
+  const tid = p.tournament_id;
+
+  // Before deleting: check if participant is in a pending filtros match and collect data
+  const filtrosPhase = db.prepare("SELECT id FROM phases WHERE tournament_id = ? AND phase_type = 'filtros'").get(tid);
+  let pendingMatches = null;
+  let remainingIds = null;
+
+  if (filtrosPhase) {
+    const pending = db.prepare(
+      "SELECT id FROM matches WHERE phase_id = ? AND status = 'pending' ORDER BY match_order ASC"
+    ).all(filtrosPhase.id);
+    const allPendingIds = pending.flatMap(m =>
+      db.prepare('SELECT participant_id FROM match_participants WHERE match_id = ?').all(m.id).map(r => r.participant_id)
+    );
+    if (allPendingIds.includes(pid)) {
+      pendingMatches = pending;
+      remainingIds = allPendingIds.filter(id => id !== pid);
+    }
+  }
+
+  // Delete participant — CASCADE removes their match_participants entry
+  db.prepare('DELETE FROM participants WHERE id = ?').run(pid);
+
+  // If they were in a pending filtros round, recompact: fill earlier rounds to groupSize
+  if (pendingMatches && pendingMatches.length > 0) {
+    const groupSize = db.prepare('SELECT group_size FROM tournaments WHERE id = ?').get(tid).group_size || 2;
+    const txn = db.transaction(() => {
+      for (const m of pendingMatches) {
+        db.prepare('DELETE FROM match_participants WHERE match_id = ?').run(m.id);
+      }
+      let pIdx = 0;
+      for (let mi = 0; mi < pendingMatches.length; mi++) {
+        const matchId = pendingMatches[mi].id;
+        const left = remainingIds.length - pIdx;
+        if (left <= 0) {
+          // Match is now empty — remove it
+          db.prepare('DELETE FROM matches WHERE id = ?').run(matchId);
+          db.prepare('UPDATE phases SET size = size - 1 WHERE id = ?').run(filtrosPhase.id);
+        } else {
+          const count = Math.min(groupSize, left);
+          for (let pos = 0; pos < count; pos++) {
+            db.prepare('INSERT INTO match_participants (match_id, participant_id, position) VALUES (?, ?, ?)')
+              .run(matchId, remainingIds[pIdx++], pos + 1);
+          }
+        }
+      }
+    });
+    txn();
+  }
+
+  req.io.to(`admin:${tid}`).emit('tournament:updated', { id: tid });
+  req.io.to(`screen:${tid}`).emit('participant:removed', p);
   res.json({ success: true });
 });
 
@@ -491,6 +543,63 @@ router.post('/tournaments/:id/update-matchups', (req, res) => {
   res.json(responseData);
 });
 
+// --- Filtros queue reorder ---
+
+router.post('/tournaments/:id/reorder-filtros', (req, res) => {
+  const tid = Number(req.params.id);
+  const { participantIds } = req.body;
+  if (!Array.isArray(participantIds) || participantIds.length === 0) {
+    return res.status(400).json({ error: 'Se requiere una lista de participantes' });
+  }
+
+  const filtrosPhase = db.prepare("SELECT * FROM phases WHERE tournament_id = ? AND phase_type = 'filtros'").get(tid);
+  if (!filtrosPhase) return res.status(400).json({ error: 'No hay fase Filtros' });
+
+  const pendingMatches = db.prepare(
+    "SELECT id FROM matches WHERE phase_id = ? AND status = 'pending' ORDER BY match_order ASC"
+  ).all(filtrosPhase.id);
+  if (pendingMatches.length === 0) {
+    return res.status(400).json({ error: 'No hay rondas pendientes para reordenar' });
+  }
+
+  // Collect current pending participant IDs and validate the provided list matches exactly
+  const currentPendingIds = pendingMatches.flatMap(m =>
+    db.prepare('SELECT participant_id FROM match_participants WHERE match_id = ?').all(m.id).map(r => r.participant_id)
+  );
+  if (participantIds.length !== currentPendingIds.length) {
+    return res.status(400).json({ error: 'La lista no coincide con los participantes pendientes' });
+  }
+  const currentSet = new Set(currentPendingIds);
+  for (const pid of participantIds) {
+    if (!currentSet.has(Number(pid))) {
+      return res.status(400).json({ error: `Participante ${pid} no pertenece a ninguna ronda pendiente` });
+    }
+  }
+
+  // Preserve per-match sizes — only reassign who goes in each slot
+  const matchSizes = pendingMatches.map(m =>
+    db.prepare('SELECT COUNT(*) as c FROM match_participants WHERE match_id = ?').get(m.id).c
+  );
+
+  const txn = db.transaction(() => {
+    for (const m of pendingMatches) {
+      db.prepare('DELETE FROM match_participants WHERE match_id = ?').run(m.id);
+    }
+    let pIdx = 0;
+    for (let mi = 0; mi < pendingMatches.length; mi++) {
+      for (let pos = 0; pos < matchSizes[mi]; pos++) {
+        db.prepare('INSERT INTO match_participants (match_id, participant_id, position) VALUES (?, ?, ?)')
+          .run(pendingMatches[mi].id, Number(participantIds[pIdx]), pos + 1);
+        pIdx++;
+      }
+    }
+  });
+  txn();
+
+  req.io.to(`admin:${tid}`).emit('tournament:updated', { id: tid });
+  res.json({ success: true });
+});
+
 // --- Match lifecycle ---
 
 router.post('/matches/:id/prepare', (req, res) => {
@@ -508,6 +617,20 @@ router.post('/matches/:id/prepare', (req, res) => {
       WHERE mp.match_id = ? ORDER BY mp.position
     `).all(mid);
     match.participants = roundParticipants;
+
+    // Block prepare if this is not the last pending round and it has fewer than groupSize participants
+    const t = db.prepare('SELECT group_size FROM tournaments WHERE id = ?').get(match.tournament_id);
+    const groupSize = t.group_size || 2;
+    if (match.participants.length < groupSize) {
+      const pendingAfter = db.prepare(
+        "SELECT id FROM matches WHERE phase_id = ? AND match_order > ? AND status = 'pending' LIMIT 1"
+      ).get(match.phase_id, match.match_order);
+      if (pendingAfter) {
+        return res.status(400).json({
+          error: `Esta ronda tiene ${match.participants.length} de ${groupSize} participantes. Deben completarse antes de prepararla.`
+        });
+      }
+    }
   } else {
     const p1 = match.participant1_id ? db.prepare('SELECT name FROM participants WHERE id = ?').get(match.participant1_id) : null;
     const p2 = match.participant2_id ? db.prepare('SELECT name FROM participants WHERE id = ?').get(match.participant2_id) : null;
@@ -531,6 +654,23 @@ router.post('/matches/:id/start', (req, res) => {
   if (!match) return res.status(404).json({ error: 'Match no encontrado' });
   if (match.status === 'live') return res.status(400).json({ error: 'El match ya está en curso' });
   if (match.status === 'finished') return res.status(400).json({ error: 'El match ya ha terminado' });
+
+  // Block starting a filtros round if it has fewer than groupSize participants and is not the last pending round
+  if (match.phase_type === 'filtros') {
+    const t = db.prepare('SELECT group_size FROM tournaments WHERE id = ?').get(match.tournament_id);
+    const groupSize = t.group_size || 2;
+    const pCount = db.prepare('SELECT COUNT(*) as c FROM match_participants WHERE match_id = ?').get(mid).c;
+    if (pCount < groupSize) {
+      const pendingAfter = db.prepare(
+        "SELECT id FROM matches WHERE phase_id = ? AND match_order > ? AND status = 'pending' LIMIT 1"
+      ).get(match.phase_id, match.match_order);
+      if (pendingAfter) {
+        return res.status(400).json({
+          error: `Esta ronda tiene ${pCount} de ${groupSize} participantes. Deben apuntarse más antes de iniciarla.`
+        });
+      }
+    }
+  }
 
   // Clean previous scores/votes for this match
   db.run('DELETE FROM filtros_scores WHERE match_id = ?', [mid]);

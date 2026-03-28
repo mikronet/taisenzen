@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, useNavigate, Link } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import Bracket from '../components/Bracket';
@@ -227,6 +227,11 @@ export function TournamentManager({ role = 'admin', onLogout }) {
   const [globalTimerFinished, setGlobalTimerFinished] = useState(false);
   // Track which match has been "prepared" (screen shown) so Iniciar is gated
   const [preparedMatchId, setPreparedMatchId] = useState(null);
+  // Filtros queue reorder mode
+  const [reorderMode, setReorderMode] = useState(false);
+  const [pendingQueue, setPendingQueue] = useState([]);
+  const reorderDragItem = useRef(null);
+  const reorderDragOver = useRef(null);
   const socket = useSocket();
 
   const showToast = (msg, isError = false) => {
@@ -314,7 +319,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
     });
     socket.on('match:result', () => { loadAll(); loadScores(); });
     socket.on('round:closed', () => { loadAll(); loadScores(); });
-    socket.on('tournament:updated', () => { setVoteStatus({}); loadAll(); });
+    socket.on('tournament:updated', () => { setVoteStatus({}); loadAll(); setReorderMode(false); });
     socket.on('timer:update', (data) => { setTimerState(data); });
     socket.on('global-timer:update', (data) => { setGlobalTimerState(data); });
 
@@ -499,12 +504,19 @@ export function TournamentManager({ role = 'admin', onLogout }) {
   const prepareMatch = async (matchId) => {
     const res = await apiFetch(`${API}/matches/${matchId}/prepare`, { method: 'POST' });
     if (res.ok) { setPreparedMatchId(matchId); showToast('Pantalla preparada ✓'); }
+    else { const err = await res.json().catch(() => ({})); showToast(err.error || 'Error al preparar', true); }
   };
 
   const startMatch = async (matchId) => {
     setActionLoading(true);
-    setPreparedMatchId(null); // clear prepared gate once match starts
-    await apiFetch(`${API}/matches/${matchId}/start`, { method: 'POST' });
+    setPreparedMatchId(null);
+    const res = await apiFetch(`${API}/matches/${matchId}/start`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Error al iniciar la ronda', true);
+      setActionLoading(false);
+      return;
+    }
     // Reset timer to idle — speaker/organizer starts it manually with the TIEMPO button
     const resetRes = await apiFetch(`${API}/tournaments/${id}/timer/reset`, { method: 'POST' });
     if (resetRes.ok) setTimerState(await resetRes.json());
@@ -542,6 +554,31 @@ export function TournamentManager({ role = 'admin', onLogout }) {
     setActionLoading(true);
     await apiFetch(`${API}/matches/${matchId}/restart`, { method: 'POST' });
     await loadAll();
+    setActionLoading(false);
+  };
+
+  const enterReorderMode = () => {
+    const queue = filtrosMatches
+      .filter(m => m.status === 'pending')
+      .flatMap(m => m.participants || []);
+    setPendingQueue(queue);
+    setReorderMode(true);
+  };
+
+  const saveReorder = async () => {
+    setActionLoading(true);
+    const res = await apiFetch(`${API}/tournaments/${id}/reorder-filtros`, {
+      method: 'POST',
+      body: JSON.stringify({ participantIds: pendingQueue.map(p => p.id) })
+    });
+    if (res.ok) {
+      setReorderMode(false);
+      await loadAll();
+      showToast('Orden actualizado ✓');
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Error al reordenar', true);
+    }
     setActionLoading(false);
   };
 
@@ -970,30 +1007,18 @@ export function TournamentManager({ role = 'admin', onLogout }) {
         const firstPendingIdx = filtrosMatches.findIndex(m => m.status !== 'finished');
         if (firstPendingIdx === -1) return null;
         const m = filtrosMatches[firstPendingIdx];
-        const isPrepared = preparedMatchId === m.id;
         return (
           <div className="card" style={{ marginBottom: '20px' }}>
             {m.status === 'pending' && !liveMatch ? (
               <div>
-                {isPrepared ? (
-                  <button
-                    className="btn-primary"
-                    style={{ width: '100%', padding: '22px 0', fontSize: '1.05rem', letterSpacing: '0.08em' }}
-                    disabled={actionLoading}
-                    onClick={() => startMatch(m.id)}
-                  >
-                    INICIAR
-                  </button>
-                ) : (
-                  <button
-                    className="btn-secondary"
-                    style={{ width: '100%', padding: '22px 0', fontSize: '1.05rem', letterSpacing: '0.08em' }}
-                    disabled={actionLoading}
-                    onClick={() => prepareMatch(m.id)}
-                  >
-                    PREPARARSE
-                  </button>
-                )}
+                <button
+                  className="btn-primary"
+                  style={{ width: '100%', padding: '22px 0', fontSize: '1.05rem', letterSpacing: '0.08em' }}
+                  disabled={actionLoading}
+                  onClick={() => startMatch(m.id)}
+                >
+                  INICIAR
+                </button>
               </div>
             ) : m.status === 'live' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1027,57 +1052,138 @@ export function TournamentManager({ role = 'admin', onLogout }) {
               <span className={`badge badge-${filtrosPhase.status === 'finished' ? 'finished' : 'live'}`}>
                 {filtrosPhase.status === 'finished' ? 'COMPLETADO' : 'EN CURSO'}
               </span>
-              <button className="btn-secondary" onClick={() => setShowRondas(v => !v)} >
+              {!filtrosDone && !reorderMode && filtrosMatches.some(m => m.status === 'pending') && (
+                <button className="btn-secondary" onClick={enterReorderMode}>
+                  Reordenar
+                </button>
+              )}
+              <button className="btn-secondary" onClick={() => { setShowRondas(v => !v); if (reorderMode) setReorderMode(false); }}>
                 {showRondas ? 'Ocultar' : 'Ver Rondas'}
               </button>
             </div>
           </div>
-          {showRondas && (() => {
-            // Only the first non-finished round is actionable — prevent accidental skips
-            const firstPendingIdx = filtrosMatches.findIndex(m => m.status !== 'finished');
-            return filtrosMatches.map((m, idx) => {
-              const isCurrentRound = idx === firstPendingIdx;
-              return (
+          {showRondas && (reorderMode ? (
+            <>
+              {/* Non-pending rounds: locked */}
+              {filtrosMatches.filter(m => m.status !== 'pending').map((m, idx) => (
                 <div key={m.id} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 14px', marginBottom: '6px',
-                  background: m.status === 'live' ? 'rgba(233,69,96,0.08)' : m.status === 'finished' ? 'rgba(0,200,83,0.05)' : 'transparent',
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '8px 14px', marginBottom: '4px', opacity: 0.55,
+                  background: m.status === 'live' ? 'rgba(233,69,96,0.06)' : 'rgba(0,200,83,0.04)',
                   borderRadius: 'var(--radius)', border: '1px solid #222'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <strong style={{ color: 'var(--text-muted)' }}>Ronda {idx + 1}</strong>
-                    {m.participants && m.participants.map(p => (
-                      <span key={p.id} style={{ fontSize: '0.95rem' }}>{p.name}</span>
-                    ))}
-                    {/* PREPARAR en el lado izquierdo para el speaker */}
-                    {m.status === 'pending' && !liveMatch && isCurrentRound && (
-                      <button className="btn-secondary" disabled={actionLoading} onClick={() => prepareMatch(m.id)}>
-                        Preparar
-                      </button>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                    {m.status === 'pending' && !liveMatch && isCurrentRound && (
-                      <button className="btn-primary" disabled={actionLoading || preparedMatchId !== m.id} onClick={() => startMatch(m.id)}>
-                        {actionLoading ? '...' : 'Iniciar'}
-                      </button>
-                    )}
-                    {m.status === 'live' && (
-                      <span className="badge badge-live">EN CURSO</span>
-                    )}
-                    {m.status === 'finished' && (
-                      <span className="badge badge-finished">Hecho</span>
-                    )}
-                    {m.status === 'finished' && !liveMatch && role !== 'speaker' && (
-                      <button className="btn-secondary" onClick={() => restartMatch(m.id)}>
-                        Repetir
-                      </button>
-                    )}
-                  </div>
+                  <strong style={{ color: 'var(--text-muted)', minWidth: '72px' }}>Ronda {idx + 1}</strong>
+                  {m.participants?.map(p => <span key={p.id} style={{ fontSize: '0.9rem' }}>{p.name}</span>)}
+                  <span className={`badge badge-${m.status === 'live' ? 'live' : 'finished'}`} style={{ marginLeft: 'auto' }}>
+                    {m.status === 'live' ? 'EN CURSO' : 'FINALIZADA'}
+                  </span>
                 </div>
-              );
-            });
-          })()}
+              ))}
+              {/* Flat draggable list of pending participants */}
+              {pendingQueue.length > 0 && (() => {
+                const pendingMatches = filtrosMatches.filter(m => m.status === 'pending');
+                const lockedCount = filtrosMatches.length - pendingMatches.length;
+                // Precompute round number for each slot in the flat queue
+                const queueRounds = [];
+                pendingMatches.forEach((m, mi) => {
+                  (m.participants || []).forEach(() => queueRounds.push(lockedCount + mi + 1));
+                });
+                return (
+                  <>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '10px 0 6px', textAlign: 'center' }}>
+                      Arrastra para cambiar el orden · las rondas se recalculan automáticamente
+                    </p>
+                    {pendingQueue.map((p, idx) => {
+                      const roundNum = queueRounds[idx];
+                      const showDivider = idx === 0 || queueRounds[idx] !== queueRounds[idx - 1];
+                      return (
+                        <div key={p.id}>
+                          {showDivider && (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '6px 14px 2px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                              Ronda {roundNum}
+                            </div>
+                          )}
+                          <div
+                            draggable
+                            onDragStart={() => { reorderDragItem.current = idx; }}
+                            onDragEnter={() => { reorderDragOver.current = idx; }}
+                            onDragEnd={() => {
+                              if (reorderDragItem.current === null || reorderDragOver.current === null) return;
+                              const q = [...pendingQueue];
+                              const dragged = q.splice(reorderDragItem.current, 1)[0];
+                              q.splice(reorderDragOver.current, 0, dragged);
+                              setPendingQueue(q);
+                              reorderDragItem.current = null;
+                              reorderDragOver.current = null;
+                            }}
+                            onDragOver={e => e.preventDefault()}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: '10px',
+                              padding: '8px 14px', marginBottom: '3px',
+                              background: 'rgba(255,255,255,0.03)',
+                              borderRadius: 'var(--radius)', border: '1px solid #333', cursor: 'grab'
+                            }}
+                          >
+                            <span style={{ color: 'var(--text-muted)', fontSize: '1rem', userSelect: 'none' }}>⠿</span>
+                            <span style={{ fontWeight: 500 }}>{p.name}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+                      <button className="btn-primary" disabled={actionLoading} onClick={saveReorder}>
+                        {actionLoading ? '...' : 'Guardar orden'}
+                      </button>
+                      <button className="btn-secondary" onClick={() => setReorderMode(false)}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </>
+          ) : (
+            (() => {
+              // Only the first non-finished round is actionable — prevent accidental skips
+              const firstPendingIdx = filtrosMatches.findIndex(m => m.status !== 'finished');
+              return filtrosMatches.map((m, idx) => {
+                const isCurrentRound = idx === firstPendingIdx;
+                return (
+                  <div key={m.id} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 14px', marginBottom: '6px',
+                    background: m.status === 'live' ? 'rgba(233,69,96,0.08)' : m.status === 'finished' ? 'rgba(0,200,83,0.05)' : 'transparent',
+                    borderRadius: 'var(--radius)', border: '1px solid #222'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <strong style={{ color: 'var(--text-muted)' }}>Ronda {idx + 1}</strong>
+                      {m.participants && m.participants.map(p => (
+                        <span key={p.id} style={{ fontSize: '0.95rem' }}>{p.name}</span>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      {m.status === 'pending' && !liveMatch && isCurrentRound && (
+                        <button className="btn-primary" disabled={actionLoading} onClick={() => startMatch(m.id)}>
+                          {actionLoading ? '...' : 'Iniciar'}
+                        </button>
+                      )}
+                      {m.status === 'live' && (
+                        <span className="badge badge-live">EN CURSO</span>
+                      )}
+                      {m.status === 'finished' && (
+                        <span className="badge badge-finished">Hecho</span>
+                      )}
+                      {m.status === 'finished' && !liveMatch && role !== 'speaker' && (
+                        <button className="btn-secondary" onClick={() => restartMatch(m.id)}>
+                          Repetir
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              });
+            })()
+          ))}
         </div>
       )}
 
@@ -1543,11 +1649,6 @@ export function TournamentManager({ role = 'admin', onLogout }) {
                 {currentSmokeMatch.status === 'live' && <span className="badge badge-live">EN CURSO</span>}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                {currentSmokeMatch.status === 'pending' && !liveMatch && (
-                  <button className="btn-secondary" disabled={actionLoading} onClick={() => prepareMatch(currentSmokeMatch.id)}>
-                    Preparar
-                  </button>
-                )}
                 {currentSmokeMatch.status === 'live' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -1561,7 +1662,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
                   </div>
                 )}
                 {currentSmokeMatch.status === 'pending' && !liveMatch && (
-                  <button className="btn-primary" disabled={actionLoading || preparedMatchId !== currentSmokeMatch.id} onClick={() => startMatch(currentSmokeMatch.id)}>
+                  <button className="btn-primary" disabled={actionLoading} onClick={() => startMatch(currentSmokeMatch.id)}>
                     {actionLoading ? '...' : 'Iniciar Batalla'}
                   </button>
                 )}
@@ -1615,30 +1716,18 @@ export function TournamentManager({ role = 'admin', onLogout }) {
             const isPending = currentElimMatch.status === 'pending';
             const isLive = currentElimMatch.status === 'live';
             const hasParticipants = currentElimMatch.participant1_id && currentElimMatch.participant2_id;
-            const isPrepared = preparedMatchId === currentElimMatch.id;
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {isPending && !liveMatch && hasParticipants && (
                   <div>
-                    {isPrepared ? (
-                      <button
-                        className="btn-primary"
-                        style={{ width: '100%', padding: '22px 0', fontSize: '1.05rem', letterSpacing: '0.08em' }}
-                        disabled={actionLoading}
-                        onClick={() => startMatch(currentElimMatch.id)}
-                      >
-                        INICIAR
-                      </button>
-                    ) : (
-                      <button
-                        className="btn-secondary"
-                        style={{ width: '100%', padding: '22px 0', fontSize: '1.05rem', letterSpacing: '0.08em' }}
-                        disabled={actionLoading}
-                        onClick={() => prepareMatch(currentElimMatch.id)}
-                      >
-                        PREPARARSE
-                      </button>
-                    )}
+                    <button
+                      className="btn-primary"
+                      style={{ width: '100%', padding: '22px 0', fontSize: '1.05rem', letterSpacing: '0.08em' }}
+                      disabled={actionLoading}
+                      onClick={() => startMatch(currentElimMatch.id)}
+                    >
+                      INICIAR
+                    </button>
                   </div>
                 )}
                 {isLive && (
@@ -1754,7 +1843,6 @@ export function TournamentManager({ role = 'admin', onLogout }) {
             phases={eliminationPhases}
             matches={eliminationMatches}
             currentMatchId={currentElimMatch?.id}
-            onPrepareMatch={prepareMatch}
             onStartMatch={startMatch}
             onRestartMatch={restartMatch}
             onRenamePhase={renamePhase}
@@ -1822,6 +1910,10 @@ export function TournamentManager({ role = 'admin', onLogout }) {
             : participants
           ).map(p => {
             const showFiltrosStatus = filtrosDone && p.total_score > 0;
+            const hasCompeted = filtrosMatches.some(m =>
+              (m.status === 'live' || m.status === 'finished') &&
+              m.participants && m.participants.some(mp => mp.id === p.id)
+            );
             return (
               <div key={p.id} className="list-item" style={{
                 background: showFiltrosStatus ? (p.eliminated ? 'rgba(198,40,40,0.08)' : 'rgba(0,200,83,0.06)') : 'transparent',
@@ -1843,7 +1935,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
                     </span>
                   )}
                 </span>
-                {!filtrosDone && (
+                {!filtrosDone && !hasCompeted && (
                   <button className="btn-danger" onClick={() => removeParticipant(p.id, p.name)} style={{ padding: '4px 10px', fontSize: '0.8rem' }}>x</button>
                 )}
               </div>

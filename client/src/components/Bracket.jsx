@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function Bracket({ phases, matches, currentMatchId, onPrepareMatch, onStartMatch, onRestartMatch, onRenamePhase, isAdmin, onSaveBracket }) {
+export default function Bracket({ phases, matches, currentMatchId, onStartMatch, onRestartMatch, onRenamePhase, isAdmin, onSaveBracket }) {
   const getMatchesForPhase = (phaseId) => matches.filter(m => m.phase_id === phaseId);
 
   // Filter out Filtros phases — they're managed separately
@@ -47,11 +47,6 @@ export default function Bracket({ phases, matches, currentMatchId, onPrepareMatc
 
                 {(isAdmin || onStartMatch) && match.participant1_id && match.participant2_id && (
                   <div style={{ padding: '8px', display: 'flex', gap: '6px', justifyContent: 'center', borderTop: '1px solid #222' }}>
-                    {match.status === 'pending' && onPrepareMatch && match.id === currentMatchId && (
-                      <button className="btn-secondary" style={{ fontSize: '0.75rem', padding: '5px 12px' }} onClick={() => onPrepareMatch(match.id)}>
-                        Preparar
-                      </button>
-                    )}
                     {match.status === 'pending' && onStartMatch && match.id === currentMatchId && (
                       <button className="btn-primary" style={{ fontSize: '0.75rem', padding: '5px 12px' }} onClick={() => onStartMatch(match.id)}>
                         Iniciar
