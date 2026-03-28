@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const db = require('../db');
 const { nanoid } = require('nanoid');
-const { uploadsDir } = require('../upload');
+const { upload, uploadsDir } = require('../upload');
 const { generateWordCode } = require('../wordCode');
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
@@ -128,7 +128,7 @@ router.delete('/tournaments/:id', (req, res) => {
   const tid = Number(req.params.id);
 
   // Collect image paths before deleting from DB
-  const tournament = db.prepare('SELECT poster_path FROM tournaments WHERE id = ?').get(tid);
+  const tournament = db.prepare('SELECT poster_path, logo_path FROM tournaments WHERE id = ?').get(tid);
   const participants = db.prepare('SELECT photo_path FROM participants WHERE tournament_id = ? AND photo_path IS NOT NULL').all(tid);
 
   db.prepare('DELETE FROM tournaments WHERE id = ?').run(tid);
@@ -136,6 +136,7 @@ router.delete('/tournaments/:id', (req, res) => {
   // Delete files from disk
   const filesToDelete = [];
   if (tournament?.poster_path) filesToDelete.push(tournament.poster_path);
+  if (tournament?.logo_path) filesToDelete.push(tournament.logo_path);
   for (const p of participants) filesToDelete.push(p.photo_path);
   for (const filename of filesToDelete) {
     try { fs.unlinkSync(path.join(uploadsDir, filename)); } catch (_) {}
@@ -1457,6 +1458,36 @@ router.put('/tournaments/:id/ticker', requireAdmin, (req, res) => {
   db.prepare('UPDATE tournaments SET ticker_message = ? WHERE id = ?').run(message, tid);
   req.io.to(`screen:${tid}`).emit('ticker:update', { message });
   res.json({ ok: true });
+});
+
+// --- Tournament logo ---
+
+router.post('/tournaments/:id/logo', upload.single('logo'), (req, res) => {
+  const tid = Number(req.params.id);
+  const tournament = db.prepare('SELECT logo_path FROM tournaments WHERE id = ?').get(tid);
+  if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
+  // Delete old logo if exists
+  if (tournament.logo_path) {
+    try { fs.unlinkSync(path.join(uploadsDir, tournament.logo_path)); } catch (_) {}
+  }
+  const logo_path = req.file ? req.file.filename : null;
+  db.prepare('UPDATE tournaments SET logo_path = ? WHERE id = ?').run(logo_path, tid);
+  req.io.to(`screen:${tid}`).emit('tournament:logo-updated', { logo_path });
+  req.io.to(`admin:${tid}`).emit('tournament:logo-updated', { logo_path });
+  res.json({ success: true, logo_path });
+});
+
+router.delete('/tournaments/:id/logo', (req, res) => {
+  const tid = Number(req.params.id);
+  const tournament = db.prepare('SELECT logo_path FROM tournaments WHERE id = ?').get(tid);
+  if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
+  if (tournament.logo_path) {
+    try { fs.unlinkSync(path.join(uploadsDir, tournament.logo_path)); } catch (_) {}
+  }
+  db.prepare('UPDATE tournaments SET logo_path = NULL WHERE id = ?').run(tid);
+  req.io.to(`screen:${tid}`).emit('tournament:logo-updated', { logo_path: null });
+  req.io.to(`admin:${tid}`).emit('tournament:logo-updated', { logo_path: null });
+  res.json({ success: true });
 });
 
 // --- Waiting screen toggle ---

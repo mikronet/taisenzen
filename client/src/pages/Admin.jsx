@@ -14,10 +14,11 @@ function apiFetch(url, options = {}) {
   const token = sessionStorage.getItem('adminToken') || '';
   const organizerCode = sessionStorage.getItem('organizerCode') || '';
   const speakerCode = sessionStorage.getItem('speakerCode') || '';
+  const isFormData = options.body instanceof FormData;
   return fetch(url, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       'x-admin-token': token,
       'x-organizer-code': organizerCode,
       'x-speaker-code': speakerCode,
@@ -212,6 +213,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
   const [tickerInput, setTickerInput] = useState('');
   const [tickerActive, setTickerActive] = useState('');
   const [waitingScreen, setWaitingScreen] = useState(false);
+  const [logoPath, setLogoPath] = useState(null);
   const [phaseConfigSaved, setPhaseConfigSaved] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState(null);
@@ -263,6 +265,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
     setTournament(tData);
     if (tData.ticker_message) { setTickerActive(tData.ticker_message); setTickerInput(tData.ticker_message); }
     setWaitingScreen(!!tData.waiting_screen);
+    setLogoPath(tData.logo_path || null);
     if (tData.timer_status !== undefined) {
       const ts = { status: tData.timer_status || 'idle', startAt: tData.timer_start_at, remainingS: tData.timer_remaining_s, durationS: tData.timer_duration_s || 60 };
       setTimerState(ts);
@@ -322,6 +325,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
     socket.on('tournament:updated', () => { setVoteStatus({}); loadAll(); setReorderMode(false); });
     socket.on('timer:update', (data) => { setTimerState(data); });
     socket.on('global-timer:update', (data) => { setGlobalTimerState(data); });
+    socket.on('tournament:logo-updated', (data) => { setLogoPath(data.logo_path || null); });
 
     return () => {
       socket.off('connect', rejoin);
@@ -331,6 +335,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
       socket.off('tournament:updated');
       socket.off('timer:update');
       socket.off('global-timer:update');
+      socket.off('tournament:logo-updated');
     };
   }, [id, socket, loadAll, loadScores]);
 
@@ -2058,6 +2063,46 @@ export function TournamentManager({ role = 'admin', onLogout }) {
           )}
           {timerState.status === 'paused' && (
             <span style={{ color: '#888', fontSize: '0.75rem', letterSpacing: '2px' }}>PAUSADO</span>
+          )}
+        </div>
+      </div>}
+
+      {/* Logo — imagen centrada en pantallas públicas */}
+      {role !== 'speaker' && <div className="card" style={{ marginBottom: '12px', padding: '14px 18px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem', letterSpacing: '0.1em', flexShrink: 0 }}>
+            LOGO PANTALLA
+          </span>
+          {logoPath && (
+            <img src={`/uploads/${logoPath}`} alt="logo" style={{ height: '40px', objectFit: 'contain', borderRadius: '4px' }} />
+          )}
+          <label style={{ cursor: 'pointer' }}>
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const formData = new FormData();
+                formData.append('logo', file);
+                const res = await apiFetch(`${API}/tournaments/${id}/logo`, { method: 'POST', body: formData });
+                if (res.ok) { const d = await res.json(); setLogoPath(d.logo_path); showToast('Logo actualizado ✓'); }
+                else showToast('Error al subir logo', true);
+                e.target.value = '';
+              }}
+            />
+            <span className="btn-secondary" style={{ fontSize: '0.82rem', padding: '6px 14px' }}>
+              {logoPath ? 'Cambiar' : 'Subir logo'}
+            </span>
+          </label>
+          {logoPath && (
+            <button className="btn-danger" style={{ fontSize: '0.82rem', padding: '6px 12px' }} onClick={async () => {
+              const res = await apiFetch(`${API}/tournaments/${id}/logo`, { method: 'DELETE' });
+              if (res.ok) { setLogoPath(null); showToast('Logo eliminado'); }
+            }}>
+              Quitar
+            </button>
           )}
         </div>
       </div>}

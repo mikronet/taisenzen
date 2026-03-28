@@ -69,7 +69,7 @@ const HYPE_MESSAGES = [
   'LA DANZA HABLA POR SÍ SOLA',
 ];
 
-function IdleScreen({ name }) {
+function IdleScreen({ name, logoPath }) {
   const [msgIdx, setMsgIdx] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -105,10 +105,20 @@ function IdleScreen({ name }) {
         }
       `}</style>
       <div style={{
-        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexDirection: 'column', gap: '36px', textAlign: 'center', padding: '40px',
+        flex: 1, display: 'flex', alignItems: 'center',
+        justifyContent: logoPath ? 'flex-start' : 'center',
+        flexDirection: 'column', gap: '36px', textAlign: 'center',
+        padding: logoPath ? '6vh 40px 40px' : '40px',
       }}>
-        {/* Logo principal */}
+        {/* Logo imagen si está configurado */}
+        {logoPath && (
+          <img
+            src={`/uploads/${logoPath}`}
+            alt="logo"
+            style={{ maxHeight: '160px', maxWidth: '500px', objectFit: 'contain', opacity: 0.95 }}
+          />
+        )}
+        {/* Nombre del torneo */}
         <p style={{
           fontFamily: 'var(--font-display)',
           fontSize: 'clamp(5rem, 14vw, 10rem)',
@@ -373,6 +383,10 @@ export default function Screen() {
         .then(data => setPhases(data.phases));
     });
 
+    socket.on('tournament:logo-updated', (data) => {
+      setTournament(prev => prev ? { ...prev, logo_path: data.logo_path } : prev);
+    });
+
     return () => {
       socket.off('match:prepare');
       socket.off('match:started');
@@ -388,6 +402,7 @@ export default function Screen() {
       socket.off('screen:waiting');
       socket.off('timer:update');
       socket.off('global-timer:update');
+      socket.off('tournament:logo-updated');
     };
   }, [tournamentId, socket]);
 
@@ -516,7 +531,7 @@ export default function Screen() {
               opacity: 0,
               animation: 'waiting-content-in 0.5s ease 0.8s forwards',
             }}>
-              <IdleScreen name={tournament.name} />
+              <IdleScreen name={tournament.name} logoPath={tournament.logo_path} />
             </div>
           </div>
         </>
@@ -565,7 +580,7 @@ export default function Screen() {
       )}
 
       {/* Header with badge system */}
-      <div style={{ padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #222' }}>
+      <div style={{ padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #222', position: 'relative' }}>
         <style>{`
           @keyframes header-name-in {
             from { opacity: 0; letter-spacing: 12px; filter: blur(6px); }
@@ -634,12 +649,12 @@ export default function Screen() {
         </div>
         {/* Right: timers */}
         {(timerState.status !== 'idle' || (is7toSmoke && globalTimerState.status !== 'idle')) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
             {/* Battle timer (per-match) */}
             {timerState.status !== 'idle' && (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '4px 16px', borderRadius: '8px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                padding: '4px 16px', borderRadius: '8px', width: '100%',
                 background: timerFinished ? 'rgba(198,40,40,0.2)' : 'rgba(255,255,255,0.06)',
                 border: `1px solid ${timerFinished ? 'rgba(198,40,40,0.5)' : timerState.status === 'paused' ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.15)'}`,
               }}>
@@ -657,8 +672,8 @@ export default function Screen() {
             {/* Global timer — 7toSmoke */}
             {is7toSmoke && globalTimerState.status !== 'idle' && (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '4px 16px', borderRadius: '8px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                padding: '4px 16px', borderRadius: '8px', width: '100%',
                 background: globalTimerFinished ? 'rgba(198,40,40,0.2)' : 'rgba(255,215,0,0.08)',
                 border: `1px solid ${globalTimerFinished ? 'rgba(198,40,40,0.5)' : 'rgba(255,215,0,0.25)'}`,
               }}>
@@ -682,6 +697,14 @@ export default function Screen() {
               </div>
             )}
           </div>
+        )}
+        {/* Logo centrado en el header */}
+        {tournament?.logo_path && (
+          <img
+            src={`/uploads/${tournament.logo_path}`}
+            alt="logo"
+            style={{ position: 'absolute', left: '50%', top: '24px', bottom: '24px', transform: 'translateX(-50%)', height: 'calc(100% - 48px)', width: 'auto', maxWidth: '220px', objectFit: 'contain', opacity: 0.9, pointerEvents: 'none' }}
+          />
         )}
       </div>
 
