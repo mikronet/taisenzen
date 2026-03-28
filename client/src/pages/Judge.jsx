@@ -26,12 +26,8 @@ export default function Judge() {
   const socket = useSocket();
 
   // Restore session on mount (judge closed tab and came back)
-  // Also auto-login if ?code= is present in the URL
+  // ?code= in the URL always takes priority over any saved session
   useEffect(() => {
-    const saved = localStorage.getItem('judgeSession');
-    if (saved) {
-      try { setJudge(JSON.parse(saved)); return; } catch (e) { localStorage.removeItem('judgeSession'); }
-    }
     const urlCode = new URLSearchParams(window.location.search).get('code');
     if (urlCode) {
       fetch('/api/judge/login', {
@@ -45,6 +41,11 @@ export default function Judge() {
           setError('Código inválido');
         }
       });
+      return;
+    }
+    const saved = localStorage.getItem('judgeSession');
+    if (saved) {
+      try { setJudge(JSON.parse(saved)); } catch (e) { localStorage.removeItem('judgeSession'); }
     }
   }, []);
 

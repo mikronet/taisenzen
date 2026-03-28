@@ -613,15 +613,46 @@ export default function Screen() {
       )}
 
       {/* Header with badge system */}
-      <div style={{ padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #222', position: 'relative' }}>
+      <div style={{ padding: '24px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #1a1a1a', position: 'relative', overflow: 'hidden' }}>
+        {/* Animated background gradient sweep */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
+        }}>
+          <div style={{
+            position: 'absolute', top: 0, bottom: 0, left: '-40%', width: '80%',
+            background: 'radial-gradient(ellipse 100% 200% at 50% 50%, rgba(233,69,96,0.13) 0%, transparent 70%)',
+            animation: 'header-bg-sweep 20s ease-in-out infinite',
+          }} />
+          {/* Traveling bottom line */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '2px',
+            background: 'linear-gradient(90deg, transparent 0%, #e94560 30%, #ffd700 50%, #e94560 70%, transparent 100%)',
+            backgroundSize: '50% 100%',
+            backgroundRepeat: 'no-repeat',
+            animation: 'header-line-travel 5s linear infinite',
+          }} />
+        </div>
+        <style>{`
+          @keyframes header-bg-sweep {
+            0%   { transform: translateX(0%);   opacity: 0.8; }
+            50%  { transform: translateX(125%); opacity: 1;   }
+            100% { transform: translateX(0%);   opacity: 0.8; }
+          }
+        `}</style>
         <style>{`
           @keyframes header-name-in {
             from { opacity: 0; letter-spacing: 12px; filter: blur(6px); }
             to   { opacity: 1; letter-spacing: 3px;  filter: blur(0); }
           }
           @keyframes header-name-glow {
-            0%, 100% { text-shadow: 0 0 24px rgba(233,69,96,0.65), 0 0 50px rgba(233,69,96,0.25); }
-            50%       { text-shadow: 0 0 40px rgba(233,69,96,0.95), 0 0 90px rgba(233,69,96,0.45); }
+            0%   { color: #ffffff; text-shadow: 0 0 24px rgba(233,69,96,0.7),  0 0 55px rgba(233,69,96,0.3); }
+            35%  { color: #ffe6ea; text-shadow: 0 0 48px rgba(233,69,96,1.0),  0 0 100px rgba(233,69,96,0.55); }
+            65%  { color: #fff8de; text-shadow: 0 0 38px rgba(255,215,0,0.85), 0 0 80px rgba(255,215,0,0.4); }
+            100% { color: #ffffff; text-shadow: 0 0 24px rgba(233,69,96,0.7),  0 0 55px rgba(233,69,96,0.3); }
+          }
+          @keyframes header-line-travel {
+            0%   { background-position: -60% 0; }
+            100% { background-position: 160% 0; }
           }
         `}</style>
         {/* Left: tournament name + phase name below */}
@@ -740,6 +771,12 @@ export default function Screen() {
           />
         )}
       </div>
+      <style>{`
+        @keyframes header-line-travel {
+          0%   { background-position: -60% 0;  }
+          100% { background-position: 210% 0; }
+        }
+      `}</style>
 
       {/* === PREPARE overlay — shown when PREPARAR is pressed === */}
       {prepareMatch && !liveMatch && (() => {
@@ -1205,7 +1242,7 @@ export default function Screen() {
       {/* Vote indicator — fixed bottom-left, subtle dots only */}
       {liveMatch && voteCount.totalJudges > 0 && (
         <div style={{
-          position: 'fixed', bottom: '22px', left: '24px',
+          position: 'fixed', bottom: '22px', left: '50%', transform: 'translateX(-50%)',
           display: 'flex', gap: '7px', alignItems: 'center', zIndex: 50,
         }}>
           {Array.from({ length: voteCount.totalJudges }, (_, i) => {

@@ -63,8 +63,11 @@ router.post('/vote', (req, res) => {
     ? allowedJudgesLen
     : db.prepare('SELECT COUNT(*) as c FROM judges WHERE tournament_id = ?').get(match.tournament_id).c;
 
+  const votesP1 = db.prepare("SELECT COUNT(*) as c FROM votes WHERE match_id = ? AND choice = 'participant1'").get(Number(matchId)).c;
+  const votesP2 = db.prepare("SELECT COUNT(*) as c FROM votes WHERE match_id = ? AND choice = 'participant2'").get(Number(matchId)).c;
+
   req.io.to(`admin:${match.tournament_id}`).emit('vote:received', {
-    matchId, judgeId, totalVotes, totalJudges, allVoted: totalVotes >= totalJudges
+    matchId, judgeId, totalVotes, totalJudges, allVoted: totalVotes >= totalJudges, votesP1, votesP2
   });
 
   req.io.to(`screen:${match.tournament_id}`).emit('vote:count', {

@@ -99,7 +99,7 @@ export default function Bracket({ phases, matches, currentMatchId, onStartMatch,
   const renderColumn = (colKey, phase, colMatches, span, showTitle) => {
     const rank = phaseRank(phase.id);
     return (
-      <div key={colKey} style={{ display: 'flex', flexDirection: 'column', flex: '1 1 0', minWidth: large ? '180px' : '160px' }}>
+      <div key={colKey} style={{ display: 'flex', flexDirection: 'column', flex: '1 1 0', minWidth: '0' }}>
         <div style={{ display: 'grid', gridTemplateRows: `repeat(${maxRows}, ${SLOT_H}px)` }}>
           {colMatches.map((match, i) => (
             <div
@@ -149,7 +149,7 @@ export default function Bracket({ phases, matches, currentMatchId, onStartMatch,
         alignItems: 'flex-start',
         justifyContent: 'center',
         gap: '4px',
-        overflowX: 'auto',
+        overflowX: 'visible',
         padding: large ? '0 32px' : '20px 24px',
         width: '100%',
         boxSizing: 'border-box',

@@ -110,6 +110,8 @@ router.get('/:id/live-match', (req, res) => {
         const vote = db.prepare('SELECT choice FROM votes WHERE match_id = ? AND judge_id = ?').get(match.id, judgeId);
         if (vote) { hasVoted = true; myVote = vote.choice; }
       }
+      match.votesP1 = db.prepare("SELECT COUNT(*) as c FROM votes WHERE match_id = ? AND choice = 'participant1'").get(match.id).c;
+      match.votesP2 = db.prepare("SELECT COUNT(*) as c FROM votes WHERE match_id = ? AND choice = 'participant2'").get(match.id).c;
     }
   }
 

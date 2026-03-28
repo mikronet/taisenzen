@@ -66,6 +66,12 @@ button:active { transform: translateY(0); }
   color: #111;
 }
 
+.btn-blue {
+  background: #1565c0;
+  color: white;
+}
+.btn-blue:hover { background: #1976d2; box-shadow: 0 4px 20px rgba(21,101,192,0.4); }
+
 .btn-gold {
   background: linear-gradient(135deg, #ffd700, #ff8c00);
   color: #111;

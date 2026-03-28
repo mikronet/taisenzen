@@ -298,6 +298,8 @@ export function TournamentManager({ role = 'admin', onLogout }) {
           totalVotes: liveData.totalVotes,
           totalJudges: liveData.totalJudges,
           allVoted: liveData.allVoted,
+          votesP1: liveData.match.votesP1 ?? 0,
+          votesP2: liveData.match.votesP2 ?? 0,
         },
       }));
     }
@@ -942,8 +944,8 @@ export function TournamentManager({ role = 'admin', onLogout }) {
       )}
 
 
-      {/* ── SPEAKER: CRONÓMETRO — siempre arriba del todo ── */}
-      {role === 'speaker' && (
+      {/* ── SPEAKER: CRONÓMETRO — solo para 7toSmoke (en filtros y eliminatorias el timer va integrado en su card) ── */}
+      {role === 'speaker' && is7toSmoke && (
         <div className="card" style={{ marginBottom: '20px' }}>
           {/* Global timer (7toSmoke) */}
           {is7toSmoke && (
@@ -1017,41 +1019,117 @@ export function TournamentManager({ role = 'admin', onLogout }) {
         </div>
       )}
 
-      {/* Speaker: vista mínima de filtros — solo botones, sin nombres ni texto */}
+      {/* Speaker: vista mínima de filtros */}
       {role === 'speaker' && filtrosPhase && filtrosMatches.length > 0 && !filtrosDone && (() => {
         const firstPendingIdx = filtrosMatches.findIndex(m => m.status !== 'finished');
         if (firstPendingIdx === -1) return null;
         const m = filtrosMatches[firstPendingIdx];
+        const roundNum = firstPendingIdx + 1;
+        const totalRounds = filtrosMatches.length;
         return (
           <div className="card" style={{ marginBottom: '20px' }}>
-            {m.status === 'pending' && !liveMatch ? (
-              <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Round info + participants */}
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.2em', marginBottom: '10px' }}>
+                  FILTROS · Ronda {roundNum}/{totalRounds}
+                </div>
+                {m.participants?.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '10px' }}>
+                    {m.participants.map(p => (
+                      <span key={p.id} style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1rem, 2.5vw, 1.5rem)', color: '#fff', letterSpacing: '2px' }}>
+                        {p.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* CONVOCAR button */}
+              {m.status === 'pending' && !liveMatch && (
                 <button
-                  className="btn-primary"
-                  style={{ width: '100%', padding: '22px 0', fontSize: '1.05rem', letterSpacing: '0.08em' }}
+                  className="btn-success"
+                  style={{ width: '100%', padding: '22px 0', fontSize: '1.1rem', letterSpacing: '0.12em', fontWeight: 700 }}
                   disabled={actionLoading}
                   onClick={() => startMatch(m.id)}
                 >
-                  INICIAR
+                  ▶ CONVOCAR A PISTA
                 </button>
-              </div>
-            ) : m.status === 'live' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ textAlign: 'center', padding: '8px 0' }}>
-                  <span className="badge badge-live" style={{ fontSize: '0.95rem', padding: '8px 28px' }}>EN CURSO</span>
+              )}
+
+              {/* EN CURSO */}
+              {m.status === 'live' && (() => {
+                const vs = voteStatus[m.id] || {};
+                const totalJ = vs.totalJudges || judges.length;
+                const totalV = vs.totalVotes || 0;
+                const allVoted = totalV >= totalJ && totalJ > 0;
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                    <span className="badge badge-live" style={{ fontSize: '0.95rem', padding: '8px 28px' }}>EN CURSO</span>
+                    {totalJ > 0 && (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {Array.from({ length: totalJ }, (_, i) => {
+                          const voted = i < totalV;
+                          return (
+                            <div key={i} style={{
+                              width: '12px', height: '12px', borderRadius: '50%',
+                              transition: 'background 0.3s, box-shadow 0.3s',
+                              background: voted ? (allVoted ? '#4caf50' : '#e94560') : 'rgba(255,255,255,0.12)',
+                              border: voted ? 'none' : '1px solid rgba(255,255,255,0.25)',
+                              boxShadow: voted ? (allVoted ? '0 0 6px rgba(76,175,80,0.7)' : '0 0 6px rgba(233,69,96,0.7)') : 'none',
+                            }} />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Timer — only when live */}
+              {m.status === 'live' && (
+                <div style={{ borderTop: '1px solid #222', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.2em' }}>CRONÓMETRO</span>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', letterSpacing: '4px', lineHeight: 1, color: timerFinished ? '#ef5350' : timerState.status === 'paused' ? 'var(--gold)' : '#fff' }}>
+                      {timerDisplay}
+                    </span>
+                  </div>
+                  {timerState.status === 'idle' && (
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <input type="number" min={5} max={3600} value={timerDurationInput}
+                        onChange={e => setTimerDurationInput(Number(e.target.value))}
+                        style={{ width: '64px', flexShrink: 0, textAlign: 'center', fontSize: '0.85rem', padding: '6px 8px' }} />
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', flexShrink: 0 }}>seg</span>
+                      <button className="btn-blue"
+                        style={{ flex: 1, padding: '14px 0', fontSize: '1rem', letterSpacing: '0.1em', fontWeight: 700 }}
+                        onClick={timerStart}>
+                        ¡INICIAR TIEMPO!
+                      </button>
+                    </div>
+                  )}
+                  {timerState.status !== 'idle' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      {timerState.status === 'running' && <button className="btn-secondary" onClick={timerPause} style={{ padding: '12px' }}>❚❚ PAUSAR</button>}
+                      {timerState.status === 'paused' && <button className="btn-blue" onClick={timerStart} style={{ padding: '12px' }}>▶ REANUDAR</button>}
+                      <button className="btn-danger" onClick={timerReset} style={{ padding: '12px' }}>↺ RESETEAR</button>
+                    </div>
+                  )}
                 </div>
-                {voteStatus[m.id]?.allVoted && (
-                  <button
-                    className="btn-gold"
-                    style={{ width: '100%', padding: '18px', fontSize: '1.05rem', letterSpacing: '0.08em' }}
-                    disabled={actionLoading}
-                    onClick={() => closeRound(m.id)}
-                  >
-                    {actionLoading ? 'Procesando...' : 'CERRAR RONDA'}
-                  </button>
-                )}
-              </div>
-            ) : null}
+              )}
+
+              {/* CERRAR RONDA */}
+              {m.status === 'live' && voteStatus[m.id]?.allVoted && (
+                <button
+                  className="btn-gold"
+                  style={{ width: '100%', padding: '18px', fontSize: '1.05rem', letterSpacing: '0.08em' }}
+                  disabled={actionLoading}
+                  onClick={() => closeRound(m.id)}
+                >
+                  {actionLoading ? 'Procesando...' : 'CERRAR RONDA'}
+                </button>
+              )}
+            </div>
           </div>
         );
       })()}
@@ -1731,36 +1809,127 @@ export function TournamentManager({ role = 'admin', onLogout }) {
             const isPending = currentElimMatch.status === 'pending';
             const isLive = currentElimMatch.status === 'live';
             const hasParticipants = currentElimMatch.participant1_id && currentElimMatch.participant2_id;
+            const phaseName = currentElimMatch.phase_name || '';
+            const elimIdx = eliminationMatches.filter(m => m.phase_id === currentElimMatch.phase_id).findIndex(m => m.id === currentElimMatch.id);
+            const phaseTotal = eliminationMatches.filter(m => m.phase_id === currentElimMatch.phase_id).length;
             return (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {isPending && !liveMatch && hasParticipants && (
-                  <div>
-                    <button
-                      className="btn-primary"
-                      style={{ width: '100%', padding: '22px 0', fontSize: '1.05rem', letterSpacing: '0.08em' }}
-                      disabled={actionLoading}
-                      onClick={() => startMatch(currentElimMatch.id)}
-                    >
-                      INICIAR
-                    </button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Phase + match info */}
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.2em', marginBottom: '8px' }}>
+                    {phaseName}{elimIdx >= 0 ? ` · Cruce ${elimIdx + 1}/${phaseTotal}` : ''}
                   </div>
-                )}
-                {isLive && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ textAlign: 'center', padding: '8px 0' }}>
-                      <span className="badge badge-live" style={{ fontSize: '0.95rem', padding: '8px 28px' }}>EN CURSO</span>
+                  {hasParticipants && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+                      <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.2rem, 3vw, 1.8rem)', color: '#fff', letterSpacing: '2px' }}>
+                        {currentElimMatch.participant1_name}
+                      </span>
+                      <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: '1rem' }}>VS</span>
+                      <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.2rem, 3vw, 1.8rem)', color: '#fff', letterSpacing: '2px' }}>
+                        {currentElimMatch.participant2_name}
+                      </span>
                     </div>
-                    {voteStatus[currentElimMatch.id]?.allVoted && (
-                      <button
-                        className="btn-gold"
-                        style={{ width: '100%', padding: '18px', fontSize: '1.05rem', letterSpacing: '0.08em' }}
-                        disabled={actionLoading}
-                        onClick={() => revealResult(currentElimMatch.id)}
-                      >
-                        {actionLoading ? 'Procesando...' : 'REVELAR RESULTADO'}
-                      </button>
+                  )}
+                </div>
+
+                {/* CONVOCAR button — only when pending */}
+                {isPending && !liveMatch && hasParticipants && (
+                  <button
+                    className="btn-success"
+                    style={{ width: '100%', padding: '22px 0', fontSize: '1.1rem', letterSpacing: '0.12em', fontWeight: 700 }}
+                    disabled={actionLoading}
+                    onClick={() => startMatch(currentElimMatch.id)}
+                  >
+                    ▶ CONVOCAR A PISTA
+                  </button>
+                )}
+
+                {/* EN CURSO badge */}
+                {isLive && (() => {
+                  const vs = voteStatus[currentElimMatch.id] || {};
+                  const totalJ = vs.totalJudges || judges.length;
+                  const totalV = vs.totalVotes || 0;
+                  const allVoted = totalV >= totalJ && totalJ > 0;
+                  const vP1 = vs.votesP1 ?? 0;
+                  const vP2 = vs.votesP2 ?? 0;
+                  const winnerName = allVoted
+                    ? (vP1 > vP2 ? currentElimMatch.participant1_name
+                      : vP2 > vP1 ? currentElimMatch.participant2_name
+                      : null)
+                    : null;
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                      <span className="badge badge-live" style={{ fontSize: '0.95rem', padding: '8px 28px' }}>EN CURSO</span>
+                      {totalJ > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {Array.from({ length: totalJ }, (_, i) => {
+                            const voted = i < totalV;
+                            return (
+                              <div key={i} style={{
+                                width: '12px', height: '12px', borderRadius: '50%',
+                                transition: 'background 0.3s, box-shadow 0.3s',
+                                background: voted ? (allVoted ? '#4caf50' : '#e94560') : 'rgba(255,255,255,0.12)',
+                                border: voted ? 'none' : '1px solid rgba(255,255,255,0.25)',
+                                boxShadow: voted ? (allVoted ? '0 0 6px rgba(76,175,80,0.7)' : '0 0 6px rgba(233,69,96,0.7)') : 'none',
+                              }} />
+                            );
+                          })}
+                        </div>
+                      )}
+                      {allVoted && (
+                        <div style={{ textAlign: 'center', marginTop: '4px' }}>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', letterSpacing: '0.2em', marginBottom: '4px' }}>GANADOR</div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 3.5vw, 2.2rem)', color: 'var(--gold)', letterSpacing: '2px', textShadow: '0 0 18px rgba(255,215,0,0.5)' }}>
+                            {winnerName || 'EMPATE'}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Timer section — only when live */}
+                {isLive && (
+                  <div style={{ borderTop: '1px solid #222', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.2em' }}>CRONÓMETRO</span>
+                      <span style={{ fontFamily: 'var(--font-display)', fontSize: '2.4rem', letterSpacing: '4px', lineHeight: 1, color: timerFinished ? '#ef5350' : timerState.status === 'paused' ? 'var(--gold)' : '#fff' }}>
+                        {timerDisplay}
+                      </span>
+                    </div>
+                    {timerState.status === 'idle' && (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input type="number" min={5} max={3600} value={timerDurationInput}
+                          onChange={e => setTimerDurationInput(Number(e.target.value))}
+                          style={{ width: '64px', flexShrink: 0, fontSize: '0.85rem', padding: '6px 8px' }} />
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>seg</span>
+                        <button className="btn-blue"
+                          style={{ flex: 1, padding: '14px 0', fontSize: '1rem', fontWeight: 700, letterSpacing: '0.08em', whiteSpace: 'nowrap' }}
+                          onClick={timerStart}>
+                          ¡INICIAR TIEMPO!
+                        </button>
+                      </div>
+                    )}
+                    {timerState.status !== 'idle' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                        {timerState.status === 'running' && <button className="btn-secondary" onClick={timerPause} style={{ padding: '12px' }}>❚❚ PAUSAR</button>}
+                        {timerState.status === 'paused' && <button className="btn-blue" onClick={timerStart} style={{ padding: '12px' }}>▶ REANUDAR</button>}
+                        <button className="btn-danger" onClick={timerReset} style={{ padding: '12px' }}>↺ RESETEAR</button>
+                      </div>
                     )}
                   </div>
+                )}
+
+                {/* REVELAR RESULTADO */}
+                {isLive && voteStatus[currentElimMatch.id]?.allVoted && (
+                  <button
+                    className="btn-gold"
+                    style={{ width: '100%', padding: '18px', fontSize: '1.05rem', letterSpacing: '0.08em' }}
+                    disabled={actionLoading}
+                    onClick={() => revealResult(currentElimMatch.id)}
+                  >
+                    {actionLoading ? 'Procesando...' : 'REVELAR RESULTADO'}
+                  </button>
                 )}
               </div>
             );
@@ -1825,7 +1994,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
         );
       })()}
 
-      {role !== 'speaker' && !is7toSmoke && <div className="card" style={{ overflow: 'auto' }}>
+      {role !== 'speaker' && !is7toSmoke && <div className="card">
         <h3 style={{ marginBottom: '12px' }}>Cuadro de Eliminatorias</h3>
         {/* Match en curso dentro de eliminatorias — votos + botón REVELAR */}
         {liveMatch && liveMatch.phase_type === 'elimination' && currentElimMatch && (
