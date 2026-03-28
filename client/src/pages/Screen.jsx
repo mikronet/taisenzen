@@ -581,7 +581,12 @@ export default function Screen() {
       {champion && (
         <div className="result-reveal" style={{ background: 'radial-gradient(ellipse, rgba(255,215,0,0.1) 0%, rgba(0,0,0,0.98) 70%)' }}>
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', height: '90vh' }}>
-            <p className="winner-name" style={{ fontSize: 'clamp(6rem, 16vw, 18rem)', marginTop: '5vh' }}>{champion}</p>
+            <p className="winner-name" style={{
+              fontFamily: "'Big Shoulders Display', var(--font-display)",
+              fontSize: `min(${(200 / Math.max(champion.length, 1)).toFixed(1)}vw, 35vh)`,
+              whiteSpace: 'nowrap',
+              marginTop: '5vh',
+            }}>{champion}</p>
             <div style={{ paddingBottom: '6vh' }}>
               <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 5rem)', color: 'var(--text-muted)', letterSpacing: '10px', marginBottom: '16px' }}>PRIMER PUESTO</p>
               <p style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', color: 'var(--text-muted)' }}>{tournament.name}</p>
@@ -874,103 +879,58 @@ export default function Screen() {
       {/* === FILTROS MODE: Live round with N participants listed === */}
       {liveMatch && liveMatch.phase_type === 'filtros' && liveMatch.participants && (() => {
         const n = liveMatch.participants.length;
-        // For N<=4: use 2x2 spatial grid (public/audience mirror of judge's CCW view)
-        // For N>4: fall back to adaptive column grid
-        if (n <= 4) {
-          // Public screen (horizontal mirror): N=2 side-by-side; N=3 TR/BR/BL; N=4 TR/BR/BL/TL
-          const PUBLIC_CCW = n === 2 ? [
-            { gridRow: 1, gridColumn: 1 },
-            { gridRow: 1, gridColumn: 2 },
-          ] : n === 3 ? [
-            { gridRow: 1, gridColumn: 2 },
-            { gridRow: 2, gridColumn: 2 },
-            { gridRow: 2, gridColumn: 1 },
-          ] : [
-            { gridRow: 1, gridColumn: 2 },
-            { gridRow: 2, gridColumn: 2 },
-            { gridRow: 2, gridColumn: 1 },
-            { gridRow: 1, gridColumn: 1 },
-          ];
-          // Uniform font size: driven by the longest name so all names share the same size
-          const longestLen = Math.max(1, ...liveMatch.participants.map(p => p.name.length));
-          const fontSize = n === 1
-            ? `min(${(41 / longestLen).toFixed(1)}vw, 22vh)`
-            : n >= 3
-              ? `min(${(82 / longestLen).toFixed(1)}vw, 38vh)`
-              : `min(${(82 / longestLen).toFixed(1)}vw, 42vh)`;
-
-          if (n === 1) {
-            return (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1, textAlign: 'center' }}>
-                  {liveMatch.participants[0].name}
-                </span>
-              </div>
-            );
-          }
-
-          return (
-            <div style={{ flex: 1, position: 'relative', display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: n >= 3 ? '1fr 1fr' : '1fr', minHeight: 0 }}>
-                {liveMatch.participants.map((p, idx) => {
-                const pos = PUBLIC_CCW[idx] || { gridRow: 'auto', gridColumn: 'auto' };
-                const is2v2 = p.member1_name || p.member2_name;
-                return (
-                  <div key={p.id} style={{ gridRow: pos.gridRow, gridColumn: pos.gridColumn, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'clamp(10px, 2vw, 28px)' }}>
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1, textAlign: 'center' }}>
-                      {p.name}
-                    </span>
-                    {is2v2 && (p.member1_name || p.member2_name) && (
-                      <div style={{ display: 'flex', gap: '14px', marginTop: '8px' }}>
-                        {p.member1_name && <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(0.9rem, 1.8vw, 1.6rem)', color: 'var(--text-muted)' }}>{p.member1_name}</span>}
-                        {p.member2_name && <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(0.9rem, 1.8vw, 1.6rem)', color: 'var(--text-muted)' }}>{p.member2_name}</span>}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        }
-        // N > 4: adaptive column grid (unchanged)
-        const cols = n <= 10 ? 2 : n <= 18 ? 3 : 4;
-        const nameFontSize = n <= 8 ? 'clamp(1.8rem, 3.5vw, 3rem)'
-          : n <= 14 ? 'clamp(1.4rem, 2.5vw, 2.2rem)'
-          : 'clamp(1.1rem, 2vw, 1.8rem)';
+        const cols = n <= 2 ? n : n <= 4 ? 2 : n <= 10 ? 2 : n <= 18 ? 3 : 4;
+        const nameFontSize = n === 1 ? 'clamp(5rem, 10vw, 14rem)'
+          : n === 2 ? 'clamp(3.5rem, 7vw, 10rem)'
+          : n <= 4 ? 'clamp(2.8rem, 5.5vw, 7rem)'
+          : n <= 8 ? 'clamp(2.4rem, 4.5vw, 5rem)'
+          : n <= 14 ? 'clamp(1.8rem, 3.2vw, 3.2rem)'
+          : 'clamp(1.4rem, 2.5vw, 2.6rem)';
+        const cardPadding = n <= 2 ? 'clamp(16px, 2.5vh, 36px) clamp(16px, 2vw, 32px)'
+          : n <= 4 ? 'clamp(12px, 2vh, 24px) clamp(12px, 1.5vw, 24px)'
+          : '10px 18px';
         return (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '30px 40px', width: '100%' }}>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1rem, 2vw, 1.6rem)', color: 'var(--gold)', letterSpacing: '4px', marginBottom: '24px', textTransform: 'uppercase' }}>
-              FILTROS — Ronda en curso
-            </p>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '20px', width: '100%' }}>
             <div style={{
               display: 'grid',
               gridTemplateColumns: `repeat(${cols}, 1fr)`,
-              gap: '10px 30px',
+              gap: n <= 4 ? '12px 16px' : '10px 20px',
               width: '100%',
-              maxWidth: cols === 2 ? '1000px' : '1400px',
             }}>
-              {liveMatch.participants.map((p, idx) => (
-                <div key={p.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '14px',
-                  padding: '10px 18px',
-                  background: 'rgba(255,255,255,0.03)',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid #333',
-                }}>
-                  <span style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 'clamp(0.85rem, 1.4vw, 1.1rem)',
-                    color: 'var(--accent)',
-                    minWidth: '32px', textAlign: 'center', fontWeight: 700
-                  }}>{idx + 1}</span>
-                  <span style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: nameFontSize,
-                    color: 'var(--text)',
-                    letterSpacing: '1px',
-                    lineHeight: 1.1,
-                  }}>{p.name}</span>
-                </div>
-              ))}
+              {liveMatch.participants.map((p, idx) => {
+                const is2v2 = p.member1_name || p.member2_name;
+                const colIdx = idx % cols;
+                const align = cols === 1 ? 'center' : colIdx < cols / 2 ? 'left' : 'right';
+                const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+                return (
+                  <div key={p.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: justify, gap: 'clamp(10px, 1.5vw, 20px)',
+                    padding: cardPadding,
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: 'var(--radius)',
+                    border: '1px solid #333',
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                      <span style={{
+                        fontFamily: "'Big Shoulders Display', var(--font-display)",
+                        fontSize: nameFontSize,
+                        color: 'var(--text)',
+                        letterSpacing: '1px',
+                        lineHeight: 1,
+                        display: 'block',
+                        textAlign: align,
+                      }}>{p.name}</span>
+                      {is2v2 && (p.member1_name || p.member2_name) && (
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                          {p.member1_name && <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(0.8rem, 1.4vw, 1.4rem)', color: 'var(--text-muted)' }}>{p.member1_name}</span>}
+                          {p.member2_name && <span style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(0.8rem, 1.4vw, 1.4rem)', color: 'var(--text-muted)' }}>{p.member2_name}</span>}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         );
@@ -1141,10 +1101,11 @@ export default function Screen() {
         if (liveMatch.participant1_name) ps.push({ id: 'p1', name: liveMatch.participant1_name });
         if (liveMatch.participant2_name) ps.push({ id: 'p2', name: liveMatch.participant2_name });
         if (ps.length === 0) return null;
+        const longestWordLen = Math.max(1, ...ps.flatMap(p => p.name.split(' ')).map(w => w.length));
         const longestLen = Math.max(1, ...ps.map(p => p.name.length));
         const fontSize = ps.length === 1
           ? `min(${(41 / longestLen).toFixed(1)}vw, 22vh)`
-          : `min(${(82 / longestLen).toFixed(1)}vw, 42vh)`;
+          : `min(${(88 / longestWordLen).toFixed(1)}vw, 42vh)`;
         if (ps.length === 1) {
           return (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1186,13 +1147,13 @@ export default function Screen() {
               }
               .vs-fire-wrap { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); zIndex: 10; }
             `}</style>
-            <div style={{ gridRow: 1, gridColumn: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(12px, 2vw, 32px)' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1, textAlign: 'center', animation: 'slide-from-left 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}>
+            <div style={{ gridRow: 1, gridColumn: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(12px, 2vw, 32px)', overflow: 'hidden' }}>
+              <span style={{ fontFamily: "'Big Shoulders Display', var(--font-display)", fontSize, color: 'var(--text)', letterSpacing: '1px', lineHeight: 1.05, textAlign: 'center', whiteSpace: 'normal', maxWidth: '100%', animation: 'slide-from-left 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}>
                 {liveMatch.participant1_name}
               </span>
             </div>
-            <div style={{ gridRow: 1, gridColumn: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(12px, 2vw, 32px)' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontSize, color: 'var(--text)', letterSpacing: '2px', lineHeight: 1, textAlign: 'center', animation: 'slide-from-right 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}>
+            <div style={{ gridRow: 1, gridColumn: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'clamp(12px, 2vw, 32px)', overflow: 'hidden' }}>
+              <span style={{ fontFamily: "'Big Shoulders Display', var(--font-display)", fontSize, color: 'var(--text)', letterSpacing: '1px', lineHeight: 1.05, textAlign: 'center', whiteSpace: 'normal', maxWidth: '100%', animation: 'slide-from-right 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards' }}>
                 {liveMatch.participant2_name}
               </span>
             </div>
@@ -1275,7 +1236,7 @@ export default function Screen() {
           `}</style>
           <div style={{
             position: 'absolute', bottom: 0, left: 0, right: 0,
-            height: '50px',
+            height: '100px',
             background: 'rgba(10,10,15,0.92)',
             borderTop: '1px solid rgba(233,69,96,0.3)',
             display: 'flex', alignItems: 'center',
@@ -1283,8 +1244,8 @@ export default function Screen() {
           }}>
             {/* Label fijo */}
             <div style={{
-              flexShrink: 0, padding: '0 18px',
-              fontFamily: 'var(--font-display)', fontSize: '0.9rem',
+              flexShrink: 0, padding: '0 28px',
+              fontFamily: 'var(--font-display)', fontSize: '1.8rem',
               color: 'var(--accent)', letterSpacing: '3px',
               borderRight: '1px solid rgba(233,69,96,0.3)',
               height: '100%', display: 'flex', alignItems: 'center',
@@ -1296,7 +1257,7 @@ export default function Screen() {
             <div style={{ flex: 1, overflow: 'hidden', position: 'relative', height: '100%' }}>
               <p style={{
                 position: 'absolute', whiteSpace: 'nowrap', top: '50%',
-                fontFamily: 'var(--font-display)', fontSize: '1.15rem',
+                fontFamily: 'var(--font-display)', fontSize: '2.3rem',
                 color: '#e8e8e8', letterSpacing: '3px', margin: 0,
                 animation: `ticker-scroll ${Math.max(12, ticker.length * 0.22)}s linear infinite`,
               }}>
