@@ -576,69 +576,112 @@ export default function Screen() {
             50%       { text-shadow: 0 0 40px rgba(233,69,96,0.95), 0 0 90px rgba(233,69,96,0.45); }
           }
         `}</style>
-        <h1
-          key={tournament?.name}
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 'clamp(2rem, 4vw, 3.5rem)',
-            color: '#ffffff',
-            letterSpacing: '3px',
-            margin: 0,
-            animation: 'header-name-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards, header-name-glow 3.5s ease-in-out 1s infinite',
-          }}
-        >
-          {tournament?.name || 'TAISEN'}
-        </h1>
-        {(phaseName || (is7toSmoke && globalTimerState.status !== 'idle')) && (
-          <>
-            <style>{`
-              @keyframes phase-glow {
-                0%, 100% { text-shadow: 0 0 18px rgba(255,215,0,0.45), 0 0 40px rgba(255,215,0,0.15); }
-                50%       { text-shadow: 0 0 32px rgba(255,215,0,0.75), 0 0 70px rgba(255,215,0,0.3); }
-              }
-            `}</style>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
-              {/* Global timer — 7toSmoke, left of phase name */}
-              {is7toSmoke && globalTimerState.status !== 'idle' && (
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: '10px',
-                  padding: '4px 16px', borderRadius: '8px',
-                  background: globalTimerFinished ? 'rgba(198,40,40,0.2)' : 'rgba(255,215,0,0.08)',
-                  border: `1px solid ${globalTimerFinished ? 'rgba(198,40,40,0.5)' : 'rgba(255,215,0,0.25)'}`,
-                }}>
-                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '3px' }}>
-                    TIEMPO
-                  </span>
+        {/* Left: tournament name + phase name below */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <h1
+            key={tournament?.name}
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(2rem, 4vw, 3.5rem)',
+              color: '#ffffff',
+              letterSpacing: '3px',
+              margin: 0,
+              animation: 'header-name-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards, header-name-glow 3.5s ease-in-out 1s infinite',
+            }}
+          >
+            {tournament?.name || 'TAISEN'}
+          </h1>
+          {phaseName && (() => {
+            const filtrosMatches = matches.filter(m => m.phase_type === 'filtros');
+            const totalRounds = filtrosMatches.length;
+            const currentRoundIdx = liveMatch?.phase_type === 'filtros'
+              ? filtrosMatches.findIndex(m => m.id === liveMatch.id)
+              : -1;
+            const currentRoundNum = currentRoundIdx >= 0 ? currentRoundIdx + 1 : null;
+            return (
+              <>
+                <style>{`
+                  @keyframes phase-glow {
+                    0%, 100% { text-shadow: 0 0 18px rgba(255,215,0,0.45), 0 0 40px rgba(255,215,0,0.15); }
+                    50%       { text-shadow: 0 0 32px rgba(255,215,0,0.75), 0 0 70px rgba(255,215,0,0.3); }
+                  }
+                `}</style>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
                   <span style={{
-                    fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 2.5vw, 2rem)', letterSpacing: '3px',
-                    color: globalTimerFinished ? '#ef5350' : globalTimerState.status === 'paused' ? 'var(--gold)' : '#fff',
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 'clamp(1rem, 1.8vw, 1.5rem)',
+                    color: 'var(--gold)',
+                    letterSpacing: '5px',
+                    textTransform: 'uppercase',
+                    animation: 'phase-glow 3s ease-in-out infinite',
                   }}>
-                    {globalTimerDisplay}
+                    {phaseName}
                   </span>
-                  {globalTimerFinished && (
-                    <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', color: '#ef5350', letterSpacing: '3px', animation: 'pulse-badge 1s infinite' }}>
-                      ¡TIEMPO!
+                  {isFiltrosActive && currentRoundNum && totalRounds > 0 && (
+                    <span style={{
+                      fontFamily: 'var(--font-display)',
+                      fontSize: 'clamp(0.8rem, 1.3vw, 1.1rem)',
+                      color: 'var(--text-muted)',
+                      letterSpacing: '3px',
+                    }}>
+                      RONDA {currentRoundNum}/{totalRounds}
                     </span>
                   )}
-                  {globalTimerState.status === 'paused' && !globalTimerFinished && (
-                    <span style={{ fontSize: '0.6rem', color: '#888', letterSpacing: '2px' }}>PAUSADO</span>
-                  )}
                 </div>
-              )}
-              {phaseName && (
+              </>
+            );
+          })()}
+        </div>
+        {/* Right: timers */}
+        {(timerState.status !== 'idle' || (is7toSmoke && globalTimerState.status !== 'idle')) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+            {/* Battle timer (per-match) */}
+            {timerState.status !== 'idle' && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '4px 16px', borderRadius: '8px',
+                background: timerFinished ? 'rgba(198,40,40,0.2)' : 'rgba(255,255,255,0.06)',
+                border: `1px solid ${timerFinished ? 'rgba(198,40,40,0.5)' : timerState.status === 'paused' ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.15)'}`,
+              }}>
                 <span style={{
-                  fontFamily: 'var(--font-display)',
-                  fontSize: 'clamp(1.4rem, 2.5vw, 2.2rem)',
-                  color: 'var(--gold)',
-                  letterSpacing: '5px',
-                  textTransform: 'uppercase',
-                  animation: 'phase-glow 3s ease-in-out infinite',
+                  fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 2.5vw, 2rem)', letterSpacing: '4px',
+                  color: timerFinished ? '#ef5350' : timerState.status === 'paused' ? 'var(--gold)' : '#fff',
                 }}>
-                  {phaseName}
+                  {timerDisplay}
                 </span>
-              )}
-            </div>
-          </>
+                {timerState.status === 'paused' && !timerFinished && (
+                  <span style={{ fontSize: '0.6rem', color: '#888', letterSpacing: '2px' }}>PAUSADO</span>
+                )}
+              </div>
+            )}
+            {/* Global timer — 7toSmoke */}
+            {is7toSmoke && globalTimerState.status !== 'idle' && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '4px 16px', borderRadius: '8px',
+                background: globalTimerFinished ? 'rgba(198,40,40,0.2)' : 'rgba(255,215,0,0.08)',
+                border: `1px solid ${globalTimerFinished ? 'rgba(198,40,40,0.5)' : 'rgba(255,215,0,0.25)'}`,
+              }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '3px' }}>
+                  TIEMPO
+                </span>
+                <span style={{
+                  fontFamily: 'var(--font-display)', fontSize: 'clamp(1.4rem, 2.5vw, 2rem)', letterSpacing: '3px',
+                  color: globalTimerFinished ? '#ef5350' : globalTimerState.status === 'paused' ? 'var(--gold)' : '#fff',
+                }}>
+                  {globalTimerDisplay}
+                </span>
+                {globalTimerFinished && (
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', color: '#ef5350', letterSpacing: '3px', animation: 'pulse-badge 1s infinite' }}>
+                    ¡TIEMPO!
+                  </span>
+                )}
+                {globalTimerState.status === 'paused' && !globalTimerFinished && (
+                  <span style={{ fontSize: '0.6rem', color: '#888', letterSpacing: '2px' }}>PAUSADO</span>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -1096,25 +1139,6 @@ export default function Screen() {
         <IdleScreen name={tournament.name} />
       )}
 
-      {/* Timer overlay — shown when timer is active (running or paused) */}
-      {timerState.status !== 'idle' && (
-        <div style={{
-          position: 'absolute', bottom: ticker ? '66px' : '24px', right: '24px', zIndex: 50,
-          background: 'rgba(0,0,0,0.85)',
-          border: `2px solid ${timerFinished ? '#c62828' : timerState.status === 'paused' ? 'rgba(255,215,0,0.4)' : 'rgba(255,255,255,0.15)'}`,
-          borderRadius: '12px', padding: '12px 20px', textAlign: 'center', minWidth: '130px',
-        }}>
-          <div style={{
-            fontFamily: 'var(--font-display)', fontSize: '2.8rem', letterSpacing: '4px', lineHeight: 1,
-            color: timerFinished ? '#ef5350' : timerState.status === 'paused' ? 'var(--gold)' : '#fff',
-          }}>
-            {timerDisplay}
-          </div>
-          {timerState.status === 'paused' && (
-            <div style={{ fontSize: '0.65rem', color: '#888', letterSpacing: '3px', marginTop: '4px' }}>PAUSADO</div>
-          )}
-        </div>
-      )}
 
       {/* Ticker bar — visible when a message is set and no match is in progress (PREPARACIÓN state) */}
       {/* Vote indicator — fixed bottom-left, subtle dots only */}
