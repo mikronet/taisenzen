@@ -713,6 +713,7 @@ router.post('/matches/:id/start', (req, res) => {
 
   req.io.to(`screen:${match.tournament_id}`).emit('match:started', match);
   req.io.to(`judge:${match.tournament_id}`).emit('match:started', match);
+  req.io.to(`admin:${match.tournament_id}`).emit('tournament:updated');
   res.json(match);
 });
 
@@ -1260,6 +1261,7 @@ router.post('/matches/:id/restart', (req, res) => {
     .run(JSON.stringify({ mode: 'idle' }), match.tournament_id);
   req.io.to(`screen:${match.tournament_id}`).emit('match:restarted', match);
   req.io.to(`judge:${match.tournament_id}`).emit('match:restarted', match);
+  req.io.to(`admin:${match.tournament_id}`).emit('tournament:updated');
   res.json({ success: true });
 });
 
@@ -1499,6 +1501,16 @@ router.put('/tournaments/:id/waiting', (req, res) => {
   const newState = tournament.waiting_screen ? 0 : 1;
   db.prepare('UPDATE tournaments SET waiting_screen = ? WHERE id = ?').run(newState, tid);
   req.io.to(`screen:${tid}`).emit('screen:waiting', { active: newState === 1 });
+  res.json({ active: newState === 1 });
+});
+
+router.put('/tournaments/:id/bracket-screen', (req, res) => {
+  const tid = Number(req.params.id);
+  const tournament = db.prepare('SELECT bracket_screen FROM tournaments WHERE id = ?').get(tid);
+  if (!tournament) return res.status(404).json({ error: 'Torneo no encontrado' });
+  const newState = tournament.bracket_screen ? 0 : 1;
+  db.prepare('UPDATE tournaments SET bracket_screen = ? WHERE id = ?').run(newState, tid);
+  req.io.to(`screen:${tid}`).emit('screen:bracket', { active: newState === 1 });
   res.json({ active: newState === 1 });
 });
 

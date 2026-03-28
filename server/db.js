@@ -268,6 +268,8 @@ async function initDb() {
     "ALTER TABLE participants ADD COLUMN audio_path TEXT DEFAULT NULL",
     // Battles: logo image for public screens
     "ALTER TABLE tournaments ADD COLUMN logo_path TEXT DEFAULT NULL",
+    // Battles: show bracket overlay on public screen
+    "ALTER TABLE tournaments ADD COLUMN bracket_screen INTEGER DEFAULT 0",
   ];
   for (const sql of migrations) {
     try { db.run(sql); } catch (e) { /* column already exists */ }

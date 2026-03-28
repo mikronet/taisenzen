@@ -195,6 +195,8 @@ export default function Screen() {
   const [ticker, setTicker] = useState('');
   // Waiting screen overlay (admin/organizer manually triggers)
   const [isWaiting, setIsWaiting] = useState(false);
+  // Bracket overlay (admin/organizer manually triggers)
+  const [showBracketOverlay, setShowBracketOverlay] = useState(false);
   // Timer state from speaker
   const [timerState, setTimerState] = useState({ status: 'idle', startAt: null, remainingS: null, durationS: 60 });
   const [timerDisplay, setTimerDisplay] = useState('');
@@ -216,6 +218,7 @@ export default function Screen() {
           setMatches(data.matches);
           if (data.tournament.ticker_message) setTicker(data.tournament.ticker_message);
           if (data.tournament.waiting_screen) setIsWaiting(true);
+          if (data.tournament.bracket_screen) setShowBracketOverlay(true);
           if (data.tournament.status === 'finished') {
             const finalPhase = data.phases[data.phases.length - 1];
             if (finalPhase) {
@@ -239,6 +242,7 @@ export default function Screen() {
 
     socket.on('screen:restore', (state) => {
       setIsWaiting(state.isWaiting || false);
+      setShowBracketOverlay(state.bracketScreen || false);
       if (state.timer) setTimerState(state.timer);
       if (state.globalTimer) setGlobalTimerState(state.globalTimer);
       if (state.mode === 'prepare') {
@@ -387,6 +391,10 @@ export default function Screen() {
       setTournament(prev => prev ? { ...prev, logo_path: data.logo_path } : prev);
     });
 
+    socket.on('screen:bracket', (data) => {
+      setShowBracketOverlay(data.active);
+    });
+
     return () => {
       socket.off('match:prepare');
       socket.off('match:started');
@@ -403,6 +411,7 @@ export default function Screen() {
       socket.off('timer:update');
       socket.off('global-timer:update');
       socket.off('tournament:logo-updated');
+      socket.off('screen:bracket');
     };
   }, [tournamentId, socket]);
 
@@ -571,11 +580,35 @@ export default function Screen() {
       {/* Champion overlay */}
       {champion && (
         <div className="result-reveal" style={{ background: 'radial-gradient(ellipse, rgba(255,215,0,0.1) 0%, rgba(0,0,0,0.98) 70%)' }}>
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: '4rem', color: 'var(--text-muted)', marginBottom: '10px', letterSpacing: '8px' }}>PRIMER PUESTO</p>
-            <p className="winner-name" style={{ fontSize: 'clamp(5rem, 12vw, 12rem)' }}>{champion}</p>
-            <p style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', color: 'var(--text-muted)', marginTop: '30px' }}>{tournament.name}</p>
+          <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between', height: '90vh' }}>
+            <p className="winner-name" style={{ fontSize: 'clamp(6rem, 16vw, 18rem)', marginTop: '5vh' }}>{champion}</p>
+            <div style={{ paddingBottom: '6vh' }}>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2rem, 4vw, 5rem)', color: 'var(--text-muted)', letterSpacing: '10px', marginBottom: '16px' }}>PRIMER PUESTO</p>
+              <p style={{ fontFamily: 'var(--font-display)', fontSize: '2.5rem', color: 'var(--text-muted)' }}>{tournament.name}</p>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Bracket overlay */}
+      {showBracketOverlay && phases.length > 0 && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          background: 'rgba(0,0,0,0.92)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          overflowY: 'auto',
+        }}>
+          <p style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', color: 'var(--gold)', letterSpacing: '0.2em', marginBottom: '24px' }}>
+            {tournament.name}
+          </p>
+          <Bracket
+            phases={phases}
+            matches={matches}
+            currentMatchId={null}
+            isAdmin={false}
+            large
+            maxHeight={window.innerHeight * 0.85}
+          />
         </div>
       )}
 
@@ -611,8 +644,8 @@ export default function Screen() {
             const totalRounds = filtrosMatches.length;
             const currentRoundIdx = liveMatch?.phase_type === 'filtros'
               ? filtrosMatches.findIndex(m => m.id === liveMatch.id)
-              : -1;
-            const currentRoundNum = currentRoundIdx >= 0 ? currentRoundIdx + 1 : null;
+              : filtrosMatches.findIndex(m => m.status !== 'finished');
+            const currentRoundNum = currentRoundIdx >= 0 ? currentRoundIdx + 1 : totalRounds || null;
             return (
               <>
                 <style>{`
@@ -1142,8 +1175,13 @@ export default function Screen() {
 
       {/* === Bracket (only for bracket tournaments, no live match) === */}
       {!liveMatch && !showFiltrosRanking && !prepareMatch && !isFiltrosActive && !isSmokeActive && phases.length > 0 && (
-        <div style={{ padding: '30px 40px', flex: 1, overflow: 'auto' }}>
-          <Bracket phases={phases.filter(p => p.phase_type === 'elimination')} matches={matches.filter(m => m.phase_type === 'elimination')} />
+        <div style={{ flex: 1, overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 30px' }}>
+          <Bracket
+            phases={phases.filter(p => p.phase_type === 'elimination')}
+            matches={matches.filter(m => m.phase_type === 'elimination')}
+            large
+            maxHeight={window.innerHeight - 160}
+          />
         </div>
       )}
 

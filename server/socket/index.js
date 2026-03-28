@@ -58,6 +58,7 @@ function setupSocket(io) {
         socket.emit('screen:restore', {
           ...state,
           isWaiting: tournament.waiting_screen === 1,
+          bracketScreen: tournament.bracket_screen === 1,
           timer: {
             status: tournament.timer_status || 'idle',
             startAt: tournament.timer_start_at,

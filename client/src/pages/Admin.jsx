@@ -213,6 +213,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
   const [tickerInput, setTickerInput] = useState('');
   const [tickerActive, setTickerActive] = useState('');
   const [waitingScreen, setWaitingScreen] = useState(false);
+  const [bracketScreen, setBracketScreen] = useState(false);
   const [logoPath, setLogoPath] = useState(null);
   const [phaseConfigSaved, setPhaseConfigSaved] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -265,6 +266,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
     setTournament(tData);
     if (tData.ticker_message) { setTickerActive(tData.ticker_message); setTickerInput(tData.ticker_message); }
     setWaitingScreen(!!tData.waiting_screen);
+    setBracketScreen(!!tData.bracket_screen);
     setLogoPath(tData.logo_path || null);
     if (tData.timer_status !== undefined) {
       const ts = { status: tData.timer_status || 'idle', startAt: tData.timer_start_at, remainingS: tData.timer_remaining_s, durationS: tData.timer_duration_s || 60 };
@@ -326,6 +328,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
     socket.on('timer:update', (data) => { setTimerState(data); });
     socket.on('global-timer:update', (data) => { setGlobalTimerState(data); });
     socket.on('tournament:logo-updated', (data) => { setLogoPath(data.logo_path || null); });
+    socket.on('screen:bracket', (data) => { setBracketScreen(data.active); });
 
     return () => {
       socket.off('connect', rejoin);
@@ -336,6 +339,7 @@ export function TournamentManager({ role = 'admin', onLogout }) {
       socket.off('timer:update');
       socket.off('global-timer:update');
       socket.off('tournament:logo-updated');
+      socket.off('screen:bracket');
     };
   }, [id, socket, loadAll, loadScores]);
 
@@ -686,6 +690,12 @@ export function TournamentManager({ role = 'admin', onLogout }) {
     const res = await apiFetch(`${API}/tournaments/${id}/waiting`, { method: 'PUT' });
     const data = await res.json();
     setWaitingScreen(data.active);
+  };
+
+  const toggleBracketScreen = async () => {
+    const res = await apiFetch(`${API}/tournaments/${id}/bracket-screen`, { method: 'PUT' });
+    const data = await res.json();
+    setBracketScreen(data.active);
   };
 
   const loadHistory = useCallback(async () => {
@@ -2143,19 +2153,35 @@ export function TournamentManager({ role = 'admin', onLogout }) {
             ▶ Activo: {tickerActive}
           </p>
         )}
-        <div style={{ marginTop: '10px', borderTop: '1px solid #2a2a2a', paddingTop: '10px' }}>
-          <button
-            className={waitingScreen ? 'btn-secondary' : 'btn-primary'}
-            onClick={toggleWaiting}
-            style={{ fontSize: '0.82rem' }}
-          >
-            {waitingScreen ? '⏹ Ocultar Pantalla en Espera' : '⏸ Mostrar Pantalla en Espera'}
-          </button>
-          {waitingScreen && (
-            <span style={{ marginLeft: '10px', fontSize: '0.75rem', color: 'var(--gold)' }}>
-              ● Activo — la pantalla pública muestra la imagen de espera
-            </span>
-          )}
+        <div style={{ marginTop: '10px', borderTop: '1px solid #2a2a2a', paddingTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div>
+            <button
+              className={waitingScreen ? 'btn-secondary' : 'btn-primary'}
+              onClick={toggleWaiting}
+              style={{ fontSize: '0.82rem' }}
+            >
+              {waitingScreen ? '⏹ Ocultar Pantalla en Espera' : '⏸ Mostrar Pantalla en Espera'}
+            </button>
+            {waitingScreen && (
+              <span style={{ marginLeft: '10px', fontSize: '0.75rem', color: 'var(--gold)' }}>
+                ● Activo — la pantalla pública muestra la imagen de espera
+              </span>
+            )}
+          </div>
+          <div>
+            <button
+              className={bracketScreen ? 'btn-secondary' : 'btn-primary'}
+              onClick={toggleBracketScreen}
+              style={{ fontSize: '0.82rem' }}
+            >
+              {bracketScreen ? '⏹ Ocultar Pantalla de Brackets' : '📊 Mostrar Pantalla de Brackets'}
+            </button>
+            {bracketScreen && (
+              <span style={{ marginLeft: '10px', fontSize: '0.75rem', color: 'var(--gold)' }}>
+                ● Activo — la pantalla pública muestra el bracket
+              </span>
+            )}
+          </div>
         </div>
       </div>}
 
