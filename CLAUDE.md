@@ -76,12 +76,13 @@ DB: SQL.js (SQLite in-memory, serialised to data/battle.db after every write)
 **`apiFetch()` in `Admin.jsx`** automatically attaches whichever credential is in `sessionStorage` (`adminToken`, `organizerCode`, or `speakerCode`). Plain `fetch()` is used for public endpoints (`/api/tournament/*`).
 
 **Speaker role** has a stripped-down UI: no participant/judge management, no bracket editor, no history. Key speaker-specific behaviours:
-- In Filtros: sees only current (first non-finished) round with PREPARAR/INICIAR separated to opposite ends of the widget.
+- In Filtros: sees a minimal card with round info + participant names, then **▶ CONVOCAR A PISTA** (btn-success, calls `startMatch`). When live: EN CURSO badge + vote dots + integrated timer (compact seconds input + ¡INICIAR TIEMPO! btn-blue) + CERRAR RONDA (btn-gold, shown when `allVoted`).
 - After Filtros: sees AVANZAR button. The ELIMINATORIAS card only appears **after** AVANZAR is pressed (`filtrosDone && !nextPhaseReady`).
-- In Elimination (bracket): sees a minimal "current match" card (phase name, cruce X de Y, participants, PREPARAR left / INICIAR right). Full bracket is hidden.
+- In Elimination (bracket): sees a minimal card with phase name, cruce X/Y, participant names VS layout, **▶ CONVOCAR A PISTA** (pending), EN CURSO badge + vote dots + winner name preview (gold, shown when `allVoted`) + integrated timer + REVELAR RESULTADO (btn-gold, shown when `allVoted`). Full bracket is hidden.
 - In 7toSmoke phase: sees a minimal card with battle number, VS display, and INICIAR BATALLA / REVELAR RESULTADO buttons. No PREPARAR (queue already set). Global timer controls (PAUSAR/REANUDAR/RESET) plus per-battle timer controls (PAUSAR/REANUDAR/RESET — timer auto-starts, no manual start needed).
 - PUNTUACIONES FILTROS widget is hidden after AVANZAR is pressed (`filtrosDone`).
 - The general "MATCH EN CURSO" widget is hidden for the speaker in 7toSmoke (their card replaces it).
+- CRONÓMETRO standalone card is only shown for 7toSmoke (`is7toSmoke`); bracket tournaments use the integrated timer inside each card.
 
 **Screen state persistence:** `tournaments.screen_state` (JSON column) is updated on every admin action so that `Screen.jsx` can fully restore its display on reconnect via `socket.on('join:screen')` → server emits `screen:restore`.
 
@@ -135,9 +136,11 @@ setup → (generate phases) → active
 
 ### `voteStatus` state in Admin.jsx
 
-The `voteStatus` map (`{ [matchId]: { totalVotes, totalJudges, allVoted } }`) controls when the "CERRAR RONDA" / "REVELAR RESULTADO" buttons appear. It is populated two ways:
-1. On page load via `loadAll()` → `GET /api/tournament/:id/live-match`
-2. In real-time via the `vote:received` socket event
+The `voteStatus` map (`{ [matchId]: { totalVotes, totalJudges, allVoted, votesP1, votesP2 } }`) controls when the "CERRAR RONDA" / "REVELAR RESULTADO" buttons appear, and provides vote breakdown for the speaker's winner preview. It is populated two ways:
+1. On page load via `loadAll()` → `GET /api/tournament/:id/live-match` (returns `match.votesP1`/`match.votesP2` for elimination matches)
+2. In real-time via the `vote:received` socket event (includes `votesP1`/`votesP2`)
+
+`votesP1`/`votesP2` are only meaningful for elimination matches (choice = `'participant1'`/`'participant2'`). For filtros (score-based) they are 0.
 
 ### Sequential match gating
 
@@ -197,6 +200,12 @@ For elimination vote on judge screen: P2 button LEFT | EMPATE button center (64p
 - `POST /tournaments/:id/global-timer/start|pause|reset` — global countdown control, emits `global-timer:update`
 - `POST /matches/:id/reveal` — branches on `phase_type === '7tosmoke'` to update points, rotate queue, create next match, check win condition
 
-**`buildTournamentData`** attaches `smoke_points` array to 7toSmoke phases. `screen:restore` includes `globalTimer` state.
+**`buildTournamentData`** attaches `smoke_points` array to 7toSmoke phases. `screen:restore` includes `globalTimer` state and `bracketScreen` boolean.
+
+**`bracket_screen` feature:** `PUT /api/admin/tournaments/:id/bracket-screen` toggles `tournaments.bracket_screen` (0/1) and emits `screen:bracket` to `screen:${tid}`. Screen.jsx listens and shows/hides a full-screen bracket overlay (`position: fixed, zIndex: 200`). State restored on reconnect via `screen:restore`.
+
+**Cross-role sync on match start/restart:** after emitting `match:started` or `match:restarted`, the server also emits `tournament:updated` to `admin:${tid}`. This ensures the speaker panel updates immediately when admin starts a match and vice versa.
+
+**Judge `?code=` URL priority:** if `?code=` is present in the URL, Judge.jsx uses it immediately (skipping any saved `localStorage` session). This prevents stale finished-tournament sessions from blocking a new judge login via URL.
 
 **Member names in elimination matches** (`participant1_member1`, `participant1_member2`, `participant2_member1`, `participant2_member2`) are included in both the `live-match` endpoint (tournament.js) and `buildTournamentData` (admin.js) via LEFT JOIN on the participants table. These are null for 1vs1 tournaments and used by Judge.jsx to show team members in the vote layout.
