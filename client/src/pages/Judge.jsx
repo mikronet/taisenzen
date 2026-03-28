@@ -350,9 +350,27 @@ export default function Judge() {
     </div>
   ) : null;
 
+  const logout = () => {
+    localStorage.removeItem('judgeSession');
+    setJudge(null);
+    setMatch(null);
+    setVoted(false);
+    setWaiting(false);
+    setSelected(null);
+    setResult(null);
+    setScores({});
+    setTournamentFinished(false);
+    setIsLockedOut(false);
+  };
+
   const judgeRoleBadge = judge ? (
-    <div style={{ position: 'fixed', top: '14px', right: '18px', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.15em', fontWeight: 600, zIndex: 200 }}>
-      JURADO · {judge.name}
+    <div style={{ position: 'fixed', top: '14px', right: '18px', display: 'flex', alignItems: 'center', gap: '10px', zIndex: 200 }}>
+      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.15em', fontWeight: 600 }}>
+        JURADO · {judge.name}
+      </span>
+      <button onClick={logout} style={{ fontSize: '0.65rem', color: '#555', background: 'none', border: '1px solid #333', borderRadius: '4px', padding: '2px 7px', cursor: 'pointer', letterSpacing: '0.1em' }}>
+        cambiar
+      </button>
     </div>
   ) : null;
 
